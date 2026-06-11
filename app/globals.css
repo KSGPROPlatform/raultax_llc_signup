@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+/* Design tokens — dark "OLED" theme with the raultax brand blue + semantic colors. */
+@theme {
+  --color-canvas: #0b0d12; /* page background */
+  --color-surface: #13161d; /* cards */
+  --color-elevated: #1b1f29; /* raised / hover */
+  --color-border: #242936;
+  --color-brand: #4f7cff; /* primary accent / active */
+  --color-brand-hover: #3a5bd0;
+  --color-foreground: #e6e8ee; /* primary text */
+  --color-muted: #8a92a6; /* secondary text */
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-foreground);
+}
