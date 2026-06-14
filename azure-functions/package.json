@@ -1,0 +1,13 @@
+{
+  "name": "raultax-functions",
+  "version": "1.0.0",
+  "description": "Azure Functions for raultax: mirror Entra users into Azure SQL",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.0",
+    "mssql": "^11.0.1"
+  }
+}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import * as na from "@/lib/nativeAuth";
+import { upsertUser } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 
 // POST /api/auth/signup
@@ -69,7 +70,9 @@ export async function POST(request: Request) {
         );
       }
 
-      const user = await na.exchangeContinuationToken(resp.continuation_token);
+      const claims = await na.exchangeContinuationToken(resp.continuation_token);
+      const { role } = await upsertUser(claims);
+      const user = { ...claims, role };
       const res = NextResponse.json({ ok: true, user });
       res.cookies.set(SESSION_COOKIE, await encryptSession(user), sessionCookieOptions());
       return res;

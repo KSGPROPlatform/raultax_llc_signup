@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import * as na from "@/lib/nativeAuth";
+import { upsertUser } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 
 // POST /api/auth/signin  { email, password }
@@ -18,7 +19,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const user = await na.signin(email, password);
+    const claims = await na.signin(email, password);
+    const { role } = await upsertUser(claims);
+    const user = { ...claims, role };
     const res = NextResponse.json({ ok: true, user });
     res.cookies.set(SESSION_COOKIE, await encryptSession(user), sessionCookieOptions());
     return res;

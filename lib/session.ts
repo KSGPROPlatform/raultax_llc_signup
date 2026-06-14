@@ -7,12 +7,19 @@ import { EncryptJWT, jwtDecrypt } from "jose";
 export const SESSION_COOKIE = "rt_session";
 export const SESSION_MAX_AGE = 60 * 60 * 8; // 8 hours
 
-// The identity we keep in the session. Microsoft owns the account; we just hold
-// enough to render the app and gate routes.
-export type SessionUser = {
+// Claims decoded from the Entra ID token (Microsoft owns the account).
+export type AuthClaims = {
   sub: string;
   email: string | null;
   name: string | null;
+};
+
+export type Role = "admin" | "user";
+
+// What we keep in the session cookie: the claims plus our app-managed role
+// (resolved from Azure SQL via the upsertUser function on sign-in/sign-up).
+export type SessionUser = AuthClaims & {
+  role: Role;
 };
 
 let keyPromise: Promise<Uint8Array> | undefined;

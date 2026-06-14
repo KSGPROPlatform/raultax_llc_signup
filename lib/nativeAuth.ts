@@ -1,6 +1,6 @@
 import "server-only";
 import { decodeJwt } from "jose";
-import type { SessionUser } from "./session";
+import type { AuthClaims } from "./session";
 
 // Server-side client for Microsoft Entra External ID **native authentication**.
 // We call Entra's HTTP API directly (the API has no CORS, so it MUST run on the
@@ -177,8 +177,8 @@ function guardRedirect(json: NaJson) {
   }
 }
 
-// Decode the ID token (received server-to-server over HTTPS) into our session.
-function tokensToUser(json: NaJson): SessionUser {
+// Decode the ID token (received server-to-server over HTTPS) into claims.
+function tokensToUser(json: NaJson): AuthClaims {
   if (json.error || !json.id_token) throw fail(json, "Could not complete sign-in.");
   const claims = decodeJwt(json.id_token) as Record<string, unknown>;
   return {
@@ -260,7 +260,7 @@ export function signupContinueAttributes(
 // Exchange a completed-flow continuation token for tokens (sign-up / SSPR).
 export async function exchangeContinuationToken(
   continuationToken: string,
-): Promise<SessionUser> {
+): Promise<AuthClaims> {
   const json = await postForm("/oauth2/v2.0/token", {
     continuation_token: continuationToken,
     grant_type: "continuation_token",
@@ -274,7 +274,7 @@ export async function exchangeContinuationToken(
 export async function signin(
   email: string,
   password: string,
-): Promise<SessionUser> {
+): Promise<AuthClaims> {
   const start = await postForm("/oauth2/v2.0/initiate", {
     username: email,
     challenge_type: "password redirect",

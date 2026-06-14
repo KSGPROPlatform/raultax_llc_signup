@@ -21,9 +21,20 @@ export default async function DashboardPage() {
         <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
           Signed in as
         </h2>
-        <p className="mt-1 text-lg font-medium text-zinc-900 dark:text-zinc-50">
-          {user.name || user.email || "Account"}
-        </p>
+        <div className="mt-1 flex items-center gap-2">
+          <p className="text-lg font-medium text-zinc-900 dark:text-zinc-50">
+            {user.name || user.email || "Account"}
+          </p>
+          <span
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              user.role === "admin"
+                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+            }`}
+          >
+            {user.role ?? "user"}
+          </span>
+        </div>
         {user.email && (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">{user.email}</p>
         )}
