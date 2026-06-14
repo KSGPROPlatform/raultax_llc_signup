@@ -1,26 +1,20 @@
 import {
   Building2,
-  FileText,
   UploadCloud,
   Plus,
   Mail,
   Hash,
   ArrowRight,
-  Download,
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { listFiles } from "@/lib/files";
 import { RoleBadge } from "@/components/dashboard/RoleBadge";
+import { FileManager } from "@/components/dashboard/FileManager";
 
 const COMPANIES = [
   { name: "Raul Holdings LLC", state: "Delaware", status: "Active", ein: "88-1234567" },
   { name: "Peter Ventures LLC", state: "Wyoming", status: "Pending", ein: "—" },
-];
-
-const DOCUMENTS = [
-  { name: "Articles_of_Organization.pdf", size: "240 KB", date: "May 12, 2026" },
-  { name: "EIN_Confirmation_CP575.pdf", size: "112 KB", date: "May 14, 2026" },
-  { name: "Operating_Agreement.docx", size: "88 KB", date: "May 20, 2026" },
 ];
 
 const QUICK_ACTIONS = [
@@ -38,6 +32,7 @@ export default async function UserDashboardPage() {
 
   const name = user.name || user.email || "there";
   const first = name.split(" ")[0];
+  const initialFiles = await listFiles(user.sub);
 
   return (
     <div className="space-y-8">
@@ -143,38 +138,7 @@ export default async function UserDashboardPage() {
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           Documents
         </h2>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-          {DOCUMENTS.map((f, i) => (
-            <div
-              key={f.name}
-              className={`flex items-center gap-3 bg-white px-4 py-3 dark:bg-zinc-950 ${
-                i !== 0 ? "border-t border-zinc-100 dark:border-zinc-800/60" : ""
-              }`}
-            >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
-                <FileText className="h-4 w-4" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {f.name}
-                </div>
-                <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {f.size} · {f.date}
-                </div>
-              </div>
-              <button
-                type="button"
-                aria-label={`Download ${f.name}`}
-                className="grid h-8 w-8 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
-              >
-                <Download className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <p className="text-xs text-zinc-400">
-          Sample data — wire these to your filings/documents store next.
-        </p>
+        <FileManager initialFiles={initialFiles} />
       </section>
     </div>
   );
