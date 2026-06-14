@@ -43,6 +43,11 @@ export async function GET() {
     } catch (err) {
       out.callError =
         err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      const cause = (err as { cause?: unknown })?.cause;
+      if (cause) {
+        const c = cause as { name?: string; message?: string; code?: string };
+        out.callCause = `${c.name ?? ""}: ${c.message ?? cause}${c.code ? ` (${c.code})` : ""}`;
+      }
     }
   }
 
