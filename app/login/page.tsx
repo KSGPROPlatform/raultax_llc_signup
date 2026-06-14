@@ -9,6 +9,7 @@ import {
   buttonClass,
   fieldClass,
   labelClass,
+  linkClass,
 } from "@/components/auth/AuthShell";
 import { postJson } from "@/lib/api";
 
@@ -42,7 +43,7 @@ function LoginForm() {
       footer={
         <>
           No account?{" "}
-          <Link href="/signup" className="font-medium text-zinc-900 underline dark:text-zinc-100">
+          <Link href="/signup" className={linkClass}>
             Create one
           </Link>
         </>
@@ -65,7 +66,7 @@ function LoginForm() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label htmlFor="password" className={labelClass}>Password</label>
-            <Link href="/reset-password" className="text-xs text-zinc-500 underline dark:text-zinc-400">
+            <Link href="/reset-password" className="text-xs font-medium text-amber-600 hover:underline dark:text-amber-400">
               Forgot?
             </Link>
           </div>

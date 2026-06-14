@@ -9,6 +9,7 @@ import {
   buttonClass,
   fieldClass,
   labelClass,
+  linkClass,
 } from "@/components/auth/AuthShell";
 import { postJson } from "@/lib/api";
 
@@ -69,7 +70,7 @@ export default function ResetPasswordPage() {
   }
 
   const back = (
-    <Link href="/login" className="font-medium text-zinc-900 underline dark:text-zinc-100">
+    <Link href="/login" className={linkClass}>
       Back to sign in
     </Link>
   );
