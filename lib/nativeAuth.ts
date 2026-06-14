@@ -312,7 +312,7 @@ export async function signin(
   return tokensToUser(token);
 }
 
-// ---- Password reset: start -> challenge -> continue(oob) -> continue(new) -> poll ----
+// ---- Password reset: start -> challenge -> continue(oob) -> submit(new) -> poll ----
 
 export async function resetStart(email: string): Promise<Challenge> {
   const start = await postForm("/resetpassword/v1.0/start", {
@@ -351,9 +351,10 @@ export async function resetSubmitNewPassword(
   continuationToken: string,
   newPassword: string,
 ): Promise<string> {
-  const submit = await postForm("/resetpassword/v1.0/continue", {
+  // New password goes to /submit (NOT /continue — that's the OTP endpoint and
+  // would demand `oob`, i.e. AADSTS900144).
+  const submit = await postForm("/resetpassword/v1.0/submit", {
     continuation_token: continuationToken,
-    grant_type: "password",
     new_password: newPassword,
   });
   let ct = requireToken(submit, "Could not set the new password.");
