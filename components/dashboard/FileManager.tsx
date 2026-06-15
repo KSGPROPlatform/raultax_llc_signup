@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   UploadCloud,
   FileText,
@@ -33,13 +33,35 @@ function previewKind(ct: string | null): "image" | "pdf" | "none" {
   return "none";
 }
 
-export function FileManager({ initialFiles }: { initialFiles: UserFile[] }) {
-  const [files, setFiles] = useState<UserFile[]>(initialFiles);
+export function FileManager() {
+  const [files, setFiles] = useState<UserFile[]>([]);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [preview, setPreview] = useState<UserFile | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load the file list client-side so a cold Function never blocks the page.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/files");
+        if (res.ok) {
+          const data = await res.json();
+          if (active) setFiles(data.files ?? []);
+        }
+      } catch {
+        /* leave empty — the user can still upload */
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function upload(list: FileList | null) {
     if (!list || !list.length) return;
@@ -136,7 +158,24 @@ export function FileManager({ initialFiles }: { initialFiles: UserFile[] }) {
       </div>
 
       {/* File list */}
-      {files.length > 0 ? (
+      {loading ? (
+        <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-3 bg-white px-4 py-3 dark:bg-zinc-950 ${
+                i !== 0 ? "border-t border-zinc-100 dark:border-zinc-800/60" : ""
+              }`}
+            >
+              <div className="h-9 w-9 shrink-0 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="h-3 w-1/3 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
+                <div className="h-2.5 w-1/5 animate-pulse rounded bg-zinc-100 dark:bg-zinc-900" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : files.length > 0 ? (
         <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
           {files.map((f, i) => {
             const k = previewKind(f.content_type);

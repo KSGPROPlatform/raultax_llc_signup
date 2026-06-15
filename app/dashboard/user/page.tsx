@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { listFiles } from "@/lib/files";
 import { RoleBadge } from "@/components/dashboard/RoleBadge";
 import { FileManager } from "@/components/dashboard/FileManager";
 
@@ -32,7 +31,6 @@ export default async function UserDashboardPage() {
 
   const name = user.name || user.email || "there";
   const first = name.split(" ")[0];
-  const initialFiles = await listFiles(user.sub);
 
   return (
     <div className="space-y-8">
@@ -138,7 +136,7 @@ export default async function UserDashboardPage() {
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           Documents
         </h2>
-        <FileManager initialFiles={initialFiles} />
+        <FileManager />
       </section>
     </div>
   );
