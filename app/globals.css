@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
+/* Make the `dark:` variant class-based instead of OS-preference based. Since we
+   never add a `.dark` class to <html>, every `dark:` utility stays inert and the
+   app renders in the light theme consistently. (Add `.dark` on <html> later to
+   re-enable a dark toggle.) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -12,15 +19,8 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
