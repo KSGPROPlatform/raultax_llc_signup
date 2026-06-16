@@ -227,27 +227,27 @@ export default function SignupPage() {
         {step === 1 && (
           <>
             <Text id="first_name" label="First name" required value={form.first_name} onChange={set("first_name")} autoComplete="given-name" />
-            <Text id="middle_name" label="Middle name" value={form.middle_name} onChange={set("middle_name")} autoComplete="additional-name" />
-            <Text id="date_of_birth" label="Date of birth" placeholder="DD/MM/YY" value={form.date_of_birth} onChange={set("date_of_birth")} autoComplete="bday" />
-            <Select id="marital_status" label="Marital status" value={form.marital_status} onChange={set("marital_status")} options={MARITAL_STATUS} />
-            <Text id="job_title" label="Job title" value={form.job_title} onChange={set("job_title")} autoComplete="organization-title" />
-            <Text id="phone_number" label="Phone number" type="tel" value={form.phone_number} onChange={set("phone_number")} autoComplete="tel" />
+            <Text id="middle_name" label="Middle name (optional)" value={form.middle_name} onChange={set("middle_name")} autoComplete="additional-name" />
+            <Text id="date_of_birth" label="Date of birth" placeholder="DD/MM/YY" required value={form.date_of_birth} onChange={set("date_of_birth")} autoComplete="bday" />
+            <Select id="marital_status" label="Marital status" required value={form.marital_status} onChange={set("marital_status")} options={MARITAL_STATUS} />
+            <Text id="job_title" label="Job title" required value={form.job_title} onChange={set("job_title")} autoComplete="organization-title" />
+            <Text id="phone_number" label="Phone number" type="tel" required value={form.phone_number} onChange={set("phone_number")} autoComplete="tel" />
           </>
         )}
 
         {step === 2 && (
           <>
-            <Text id="street_address" label="Street address" value={form.street_address} onChange={set("street_address")} autoComplete="street-address" />
-            <Text id="city" label="City" value={form.city} onChange={set("city")} autoComplete="address-level2" />
-            <Text id="state_province" label="State / Province" value={form.state_province} onChange={set("state_province")} autoComplete="address-level1" />
-            <Text id="postal_code" label="Postal code" value={form.postal_code} onChange={set("postal_code")} autoComplete="postal-code" />
+            <Text id="street_address" label="Street address" required value={form.street_address} onChange={set("street_address")} autoComplete="street-address" />
+            <Text id="city" label="City" required value={form.city} onChange={set("city")} autoComplete="address-level2" />
+            <Text id="state_province" label="State / Province" required value={form.state_province} onChange={set("state_province")} autoComplete="address-level1" />
+            <Text id="postal_code" label="Postal code" required value={form.postal_code} onChange={set("postal_code")} autoComplete="postal-code" />
           </>
         )}
 
         {step === 3 && (
           <>
-            <Select id="filing_status" label="Filing status" value={form.filing_status} onChange={set("filing_status")} options={FILING_STATUS} />
-            <Text id="ssn" label="Social Security number" value={form.ssn} onChange={set("ssn")} hint="Stored securely on your account." autoComplete="off" />
+            <Select id="filing_status" label="Filing status" required value={form.filing_status} onChange={set("filing_status")} options={FILING_STATUS} />
+            <Text id="ssn" label="Social Security number" required value={form.ssn} onChange={set("ssn")} hint="Stored securely on your account." autoComplete="off" />
           </>
         )}
 
@@ -300,19 +300,28 @@ function Select({
   options,
   value,
   onChange,
+  required,
 }: {
   id: string;
   label: string;
   options: string[];
   value: string;
   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  required?: boolean;
 }) {
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className={labelClass}>
         {label}
+        {required && <span className="text-amber-500"> *</span>}
       </label>
-      <select id={id} value={value} onChange={onChange} className={`${fieldClass} cursor-pointer`}>
+      <select
+        id={id}
+        value={value}
+        onChange={onChange}
+        required={required}
+        className={`${fieldClass} cursor-pointer`}
+      >
         <option value="">Select…</option>
         {options.map((o) => (
           <option key={o} value={o}>
