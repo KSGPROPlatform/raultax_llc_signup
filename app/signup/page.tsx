@@ -111,6 +111,7 @@ export default function SignupPage() {
       step: "start",
       email: form.email,
       password: form.password,
+      displayName: `${form.first_name} ${form.last_name}`.trim(),
     });
     setLoading(false);
     if (!ok || !data) return setError(error);

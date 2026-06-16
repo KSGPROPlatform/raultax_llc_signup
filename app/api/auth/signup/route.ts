@@ -19,15 +19,19 @@ export async function POST(request: Request) {
 
   try {
     if (body.step === "start") {
-      const { email, password } = body;
+      const { email, password, displayName } = body;
       if (!email || !password) {
         return NextResponse.json(
           { error: "Email and password are required." },
           { status: 400 },
         );
       }
-      // Identity only — the rich profile is stored in our DB, not Entra.
-      const ct = await na.signupStart(email, password);
+      // Set the Entra displayName (first + last); the rich profile stays in our DB.
+      const ct = await na.signupStart(
+        email,
+        password,
+        displayName ? { displayName } : undefined,
+      );
       const challenge = await na.signupChallenge(ct);
       return NextResponse.json({
         continuationToken: challenge.continuationToken,
