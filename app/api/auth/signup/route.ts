@@ -19,18 +19,15 @@ export async function POST(request: Request) {
 
   try {
     if (body.step === "start") {
-      const { email, password, name } = body;
+      const { email, password } = body;
       if (!email || !password) {
         return NextResponse.json(
           { error: "Email and password are required." },
           { status: 400 },
         );
       }
-      const ct = await na.signupStart(
-        email,
-        password,
-        name ? { displayName: name } : undefined,
-      );
+      // Identity only — the rich profile is stored in our DB, not Entra.
+      const ct = await na.signupStart(email, password);
       const challenge = await na.signupChallenge(ct);
       return NextResponse.json({
         continuationToken: challenge.continuationToken,
@@ -40,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     if (body.step === "verify") {
-      const { continuationToken, otp, password, name } = body;
+      const { continuationToken, otp, password, name, profile } = body;
       if (!continuationToken || !otp) {
         return NextResponse.json(
           { error: "The verification code is required." },
@@ -71,7 +68,7 @@ export async function POST(request: Request) {
       }
 
       const claims = await na.exchangeContinuationToken(resp.continuation_token);
-      const { role } = await upsertUser(claims);
+      const { role } = await upsertUser(claims, profile);
       const user = { ...claims, role };
       const res = NextResponse.json({ ok: true, user });
       res.cookies.set(SESSION_COOKIE, await encryptSession(user), sessionCookieOptions());

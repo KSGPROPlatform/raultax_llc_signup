@@ -1,42 +1,76 @@
 const { app } = require("@azure/functions");
 const { sql, getPool } = require("../db");
 
-// POST /api/upsertUser   body: { oid, email, name }
+// POST /api/upsertUser   body: { oid, email, name, ...profile }
 // Mirrors an Entra user into raul_tax_users, keyed by the Entra object id (oid).
-// New users default to role 'user'; existing rows keep whatever role the DB
-// holds (so a manual promotion to 'admin' is never overwritten on next sign-in).
-// Called server-to-server by the Next.js auth routes after Entra issues tokens.
-// Returns the saved row (including role).
+// Profile fields (first_name, ssn, address, etc.) are collected by our own
+// sign-up form and stored here — they are NOT in Entra.
+//
+// New users default to role 'user'. On an existing row we keep the role and use
+// COALESCE for profile fields, so a later SIGN-IN (which sends no profile) never
+// wipes data captured at sign-up. Returns the saved row (including role).
 app.http("upsertUser", {
   methods: ["POST"],
   authLevel: "function",
   route: "upsertUser",
   handler: async (request, context) => {
     try {
-      const body = await request.json().catch(() => ({}));
-      const { oid, email, name } = body || {};
-
-      if (!oid) {
+      const b = (await request.json().catch(() => ({}))) || {};
+      if (!b.oid) {
         return { status: 400, jsonBody: { error: "oid is required" } };
       }
 
       const pool = await getPool();
       const result = await pool
         .request()
-        .input("oid", sql.NVarChar(64), oid)
-        .input("email", sql.NVarChar(256), email ?? null)
-        .input("name", sql.NVarChar(256), name ?? null).query(`
+        .input("oid", sql.NVarChar(64), b.oid)
+        .input("email", sql.NVarChar(256), b.email ?? null)
+        .input("name", sql.NVarChar(256), b.name ?? null)
+        .input("first_name", sql.NVarChar(128), b.first_name ?? null)
+        .input("middle_name", sql.NVarChar(128), b.middle_name ?? null)
+        .input("date_of_birth", sql.NVarChar(32), b.date_of_birth ?? null)
+        .input("filing_status", sql.NVarChar(64), b.filing_status ?? null)
+        .input("marital_status", sql.NVarChar(64), b.marital_status ?? null)
+        .input("job_title", sql.NVarChar(128), b.job_title ?? null)
+        .input("phone_number", sql.NVarChar(32), b.phone_number ?? null)
+        .input("ssn", sql.NVarChar(32), b.ssn ?? null)
+        .input("street_address", sql.NVarChar(256), b.street_address ?? null)
+        .input("city", sql.NVarChar(128), b.city ?? null)
+        .input("state_province", sql.NVarChar(128), b.state_province ?? null)
+        .input("postal_code", sql.NVarChar(32), b.postal_code ?? null).query(`
           MERGE raul_tax_users AS target
           USING (SELECT @oid AS entra_object_id) AS source
             ON target.entra_object_id = source.entra_object_id
           WHEN MATCHED THEN
-            UPDATE SET email = @email, name = @name, updated_at = SYSUTCDATETIME()
+            UPDATE SET
+              email = @email,
+              name = @name,
+              first_name     = COALESCE(@first_name, first_name),
+              middle_name    = COALESCE(@middle_name, middle_name),
+              date_of_birth  = COALESCE(@date_of_birth, date_of_birth),
+              filing_status  = COALESCE(@filing_status, filing_status),
+              marital_status = COALESCE(@marital_status, marital_status),
+              job_title      = COALESCE(@job_title, job_title),
+              phone_number   = COALESCE(@phone_number, phone_number),
+              ssn            = COALESCE(@ssn, ssn),
+              street_address = COALESCE(@street_address, street_address),
+              city           = COALESCE(@city, city),
+              state_province = COALESCE(@state_province, state_province),
+              postal_code    = COALESCE(@postal_code, postal_code),
+              updated_at = SYSUTCDATETIME()
           WHEN NOT MATCHED THEN
-            INSERT (entra_object_id, email, name, role, created_at, updated_at)
-            VALUES (@oid, @email, @name, 'user', SYSUTCDATETIME(), SYSUTCDATETIME())
+            INSERT (entra_object_id, email, name, role,
+                    first_name, middle_name, date_of_birth, filing_status,
+                    marital_status, job_title, phone_number, ssn,
+                    street_address, city, state_province, postal_code,
+                    created_at, updated_at)
+            VALUES (@oid, @email, @name, 'user',
+                    @first_name, @middle_name, @date_of_birth, @filing_status,
+                    @marital_status, @job_title, @phone_number, @ssn,
+                    @street_address, @city, @state_province, @postal_code,
+                    SYSUTCDATETIME(), SYSUTCDATETIME())
           OUTPUT inserted.id, inserted.entra_object_id, inserted.email,
-                 inserted.name, inserted.role, inserted.created_at,
-                 inserted.updated_at;
+                 inserted.name, inserted.role;
         `);
 
       return { status: 200, jsonBody: result.recordset[0] };

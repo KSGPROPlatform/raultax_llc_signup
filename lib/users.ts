@@ -1,13 +1,33 @@
 import "server-only";
 import type { AuthClaims, Role } from "./session";
 
+// Rich profile collected by our own sign-up form (stored in raul_tax_users, NOT
+// in Entra). All optional — only sent on sign-up.
+export type Profile = {
+  first_name?: string;
+  middle_name?: string;
+  date_of_birth?: string;
+  filing_status?: string;
+  marital_status?: string;
+  job_title?: string;
+  phone_number?: string;
+  ssn?: string;
+  street_address?: string;
+  city?: string;
+  state_province?: string;
+  postal_code?: string;
+};
+
 // Mirrors the signed-in user into Azure SQL by calling our standalone
 // `upsertUser` Azure Function server-to-server, and returns the resolved role.
 //
 // Resilient by design: if the function/DB is unconfigured or unreachable, we log
 // and fall back to role "user" so authentication NEVER breaks because of the
 // profile store.
-export async function upsertUser(claims: AuthClaims): Promise<{ role: Role }> {
+export async function upsertUser(
+  claims: AuthClaims,
+  profile?: Profile,
+): Promise<{ role: Role }> {
   // NB: not FUNCTIONS_* — Azure Static Web Apps reserves that prefix.
   const base = process.env.PROFILE_API_URL;
   const key = process.env.PROFILE_API_KEY;
@@ -27,6 +47,7 @@ export async function upsertUser(claims: AuthClaims): Promise<{ role: Role }> {
         oid: claims.sub,
         email: claims.email,
         name: claims.name,
+        ...(profile ?? {}),
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(10000),
