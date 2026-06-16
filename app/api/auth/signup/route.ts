@@ -68,8 +68,11 @@ export async function POST(request: Request) {
       }
 
       const claims = await na.exchangeContinuationToken(resp.continuation_token);
-      const { role } = await upsertUser(claims, profile);
-      const user = { ...claims, role };
+      // Native sign-ups have no Entra displayName, so use the name the user
+      // typed (claims.name would be empty/"unknown").
+      const named = { ...claims, name: name || claims.name };
+      const { role } = await upsertUser(named, profile);
+      const user = { ...named, role };
       const res = NextResponse.json({ ok: true, user });
       res.cookies.set(SESSION_COOKIE, await encryptSession(user), sessionCookieOptions());
       return res;
