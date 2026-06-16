@@ -26,6 +26,7 @@ type Form = {
   email: string;
   password: string;
   first_name: string;
+  last_name: string;
   middle_name: string;
   date_of_birth: string;
   marital_status: string;
@@ -43,6 +44,7 @@ const EMPTY: Form = {
   email: "",
   password: "",
   first_name: "",
+  last_name: "",
   middle_name: "",
   date_of_birth: "",
   marital_status: "",
@@ -121,9 +123,12 @@ export default function SignupPage() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const name = [form.first_name, form.middle_name].filter(Boolean).join(" ");
+    const name = [form.first_name, form.middle_name, form.last_name]
+      .filter(Boolean)
+      .join(" ");
     const profile = {
       first_name: form.first_name,
+      last_name: form.last_name,
       middle_name: form.middle_name,
       date_of_birth: form.date_of_birth,
       filing_status: form.filing_status,
@@ -227,6 +232,7 @@ export default function SignupPage() {
         {step === 1 && (
           <>
             <Text id="first_name" label="First name" required value={form.first_name} onChange={set("first_name")} autoComplete="given-name" />
+            <Text id="last_name" label="Last name" required value={form.last_name} onChange={set("last_name")} autoComplete="family-name" />
             <Text id="middle_name" label="Middle name (optional)" value={form.middle_name} onChange={set("middle_name")} autoComplete="additional-name" />
             <Text id="date_of_birth" label="Date of birth" placeholder="DD/MM/YY" required value={form.date_of_birth} onChange={set("date_of_birth")} autoComplete="bday" />
             <Select id="marital_status" label="Marital status" required value={form.marital_status} onChange={set("marital_status")} options={MARITAL_STATUS} />

@@ -5,6 +5,7 @@ import type { AuthClaims, Role } from "./session";
 // in Entra). All optional — only sent on sign-up.
 export type Profile = {
   first_name?: string;
+  last_name?: string;
   middle_name?: string;
   date_of_birth?: string;
   filing_status?: string;

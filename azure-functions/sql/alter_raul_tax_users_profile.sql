@@ -9,6 +9,7 @@
 -- =====================================================================
 ALTER TABLE dbo.raul_tax_users ADD
   first_name      NVARCHAR(128) NOT NULL DEFAULT '',
+  last_name       NVARCHAR(128) NOT NULL DEFAULT '',
   middle_name     NVARCHAR(128) NULL,                  -- optional
   date_of_birth   NVARCHAR(32)  NOT NULL DEFAULT '',
   filing_status   NVARCHAR(64)  NOT NULL DEFAULT '',
@@ -26,13 +27,15 @@ ALTER TABLE dbo.raul_tax_users ADD
 -- nullable ADD). Backfill NULLs, then enforce NOT NULL. Uncomment & run.
 -- =====================================================================
 -- UPDATE dbo.raul_tax_users SET
---   first_name=ISNULL(first_name,''),     date_of_birth=ISNULL(date_of_birth,''),
+--   first_name=ISNULL(first_name,''),     last_name=ISNULL(last_name,''),
+--   date_of_birth=ISNULL(date_of_birth,''),
 --   filing_status=ISNULL(filing_status,''), marital_status=ISNULL(marital_status,''),
 --   job_title=ISNULL(job_title,''),        phone_number=ISNULL(phone_number,''),
 --   ssn=ISNULL(ssn,''),                    street_address=ISNULL(street_address,''),
 --   city=ISNULL(city,''),                  state_province=ISNULL(state_province,''),
 --   postal_code=ISNULL(postal_code,'');
 -- ALTER TABLE dbo.raul_tax_users ALTER COLUMN first_name     NVARCHAR(128) NOT NULL;
+-- ALTER TABLE dbo.raul_tax_users ALTER COLUMN last_name      NVARCHAR(128) NOT NULL;
 -- ALTER TABLE dbo.raul_tax_users ALTER COLUMN date_of_birth  NVARCHAR(32)  NOT NULL;
 -- ALTER TABLE dbo.raul_tax_users ALTER COLUMN filing_status  NVARCHAR(64)  NOT NULL;
 -- ALTER TABLE dbo.raul_tax_users ALTER COLUMN marital_status NVARCHAR(64)  NOT NULL;

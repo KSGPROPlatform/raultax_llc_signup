@@ -27,6 +27,7 @@ app.http("upsertUser", {
         .input("email", sql.NVarChar(256), b.email ?? null)
         .input("name", sql.NVarChar(256), b.name ?? null)
         .input("first_name", sql.NVarChar(128), b.first_name ?? null)
+        .input("last_name", sql.NVarChar(128), b.last_name ?? null)
         .input("middle_name", sql.NVarChar(128), b.middle_name ?? null)
         .input("date_of_birth", sql.NVarChar(32), b.date_of_birth ?? null)
         .input("filing_status", sql.NVarChar(64), b.filing_status ?? null)
@@ -46,6 +47,7 @@ app.http("upsertUser", {
               email = @email,
               name = @name,
               first_name     = COALESCE(@first_name, first_name),
+              last_name      = COALESCE(@last_name, last_name),
               middle_name    = COALESCE(@middle_name, middle_name),
               date_of_birth  = COALESCE(@date_of_birth, date_of_birth),
               filing_status  = COALESCE(@filing_status, filing_status),
@@ -60,12 +62,12 @@ app.http("upsertUser", {
               updated_at = SYSUTCDATETIME()
           WHEN NOT MATCHED THEN
             INSERT (entra_object_id, email, name, role,
-                    first_name, middle_name, date_of_birth, filing_status,
+                    first_name, last_name, middle_name, date_of_birth, filing_status,
                     marital_status, job_title, phone_number, ssn,
                     street_address, city, state_province, postal_code,
                     created_at, updated_at)
             VALUES (@oid, @email, @name, 'user',
-                    ISNULL(@first_name, ''), ISNULL(@middle_name, ''),
+                    ISNULL(@first_name, ''), ISNULL(@last_name, ''), ISNULL(@middle_name, ''),
                     ISNULL(@date_of_birth, ''), ISNULL(@filing_status, ''),
                     ISNULL(@marital_status, ''), ISNULL(@job_title, ''),
                     ISNULL(@phone_number, ''), ISNULL(@ssn, ''),
