@@ -65,9 +65,12 @@ app.http("upsertUser", {
                     street_address, city, state_province, postal_code,
                     created_at, updated_at)
             VALUES (@oid, @email, @name, 'user',
-                    @first_name, @middle_name, @date_of_birth, @filing_status,
-                    @marital_status, @job_title, @phone_number, @ssn,
-                    @street_address, @city, @state_province, @postal_code,
+                    ISNULL(@first_name, ''), ISNULL(@middle_name, ''),
+                    ISNULL(@date_of_birth, ''), ISNULL(@filing_status, ''),
+                    ISNULL(@marital_status, ''), ISNULL(@job_title, ''),
+                    ISNULL(@phone_number, ''), ISNULL(@ssn, ''),
+                    ISNULL(@street_address, ''), ISNULL(@city, ''),
+                    ISNULL(@state_province, ''), ISNULL(@postal_code, ''),
                     SYSUTCDATETIME(), SYSUTCDATETIME())
           OUTPUT inserted.id, inserted.entra_object_id, inserted.email,
                  inserted.name, inserted.role;
