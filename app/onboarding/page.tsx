@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { buttonClass, FormError } from "@/components/auth/AuthShell";
@@ -47,8 +47,31 @@ export default function OnboardingPage() {
   const [finishing, setFinishing] = useState(false);
   const [personal, setPersonal] = useState<Partial<PersonalInfoValues>>({});
   const [savingPersonal, setSavingPersonal] = useState(false);
+  const [loadedPersonal, setLoadedPersonal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const last = STEPS.length - 1;
+
+  // Pre-fill the Personal-info step with what's already saved (first/last from
+  // sign-up, plus anything entered on a previous visit).
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/profile/personal");
+        if (res.ok && active) {
+          const data = await res.json();
+          if (data.profile) setPersonal(data.profile);
+        }
+      } catch {
+        /* fall back to empty fields */
+      } finally {
+        if (active) setLoadedPersonal(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Step 0 "Continue" is the PersonalInfoForm's own submit button. Save to the
   // DB, remember the values (so re-visiting shows them), then advance.
@@ -127,19 +150,24 @@ export default function OnboardingPage() {
           </p>
 
           <div className="mt-6">
-            {step === 0 && (
-              <>
-                <div className="mb-4">
-                  <FormError message={error} />
+            {step === 0 &&
+              (loadedPersonal ? (
+                <>
+                  <div className="mb-4">
+                    <FormError message={error} />
+                  </div>
+                  <PersonalInfoForm
+                    initial={personal}
+                    busy={savingPersonal}
+                    submitLabel="Save & continue"
+                    onSubmit={savePersonal}
+                  />
+                </>
+              ) : (
+                <div className="grid place-items-center py-10 text-zinc-400">
+                  <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
-                <PersonalInfoForm
-                  initial={personal}
-                  busy={savingPersonal}
-                  submitLabel="Save & continue"
-                  onSubmit={savePersonal}
-                />
-              </>
-            )}
+              ))}
             {step === 1 && <DependentsSection />}
             {step === 2 && <BankSection />}
             {step === 3 && <CompaniesSection />}

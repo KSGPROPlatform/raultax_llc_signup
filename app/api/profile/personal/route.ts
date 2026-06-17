@@ -3,6 +3,31 @@ import { getSession } from "@/lib/auth";
 import { upsertUser, type Profile } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 import type { PersonalInfoValues } from "@/components/profile/PersonalInfoForm";
+import { getUserProfile } from "@/lib/profileData";
+
+// GET /api/profile/personal — the user's saved personal info (first/last from
+// sign-up + anything from a prior visit), used to pre-fill the onboarding step.
+export async function GET() {
+  const user = await getSession();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const p = await getUserProfile(user.sub);
+  const profile: PersonalInfoValues = {
+    first_name: p?.first_name ?? "",
+    middle_name: p?.middle_name ?? "",
+    last_name: p?.last_name ?? "",
+    date_of_birth: p?.date_of_birth ?? "",
+    marital_status: p?.marital_status ?? "",
+    filing_status: p?.filing_status ?? "",
+    job_title: p?.job_title ?? "",
+    phone_number: p?.phone_number ?? "",
+    ssn: p?.ssn ?? "",
+    street_address: p?.street_address ?? "",
+    city: p?.city ?? "",
+    state_province: p?.state_province ?? "",
+    postal_code: p?.postal_code ?? "",
+  };
+  return NextResponse.json({ profile });
+}
 
 // POST /api/profile/personal — saves the Personal info (the first onboarding
 // step) into our DB, sets the user's name, and re-mints the session so the

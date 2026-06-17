@@ -16,6 +16,8 @@ import { postJson } from "@/lib/api";
 export default function SignupPage() {
   const router = useRouter();
   const [step, setStep] = useState<"account" | "otp">("account");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [continuationToken, setContinuationToken] = useState("");
@@ -27,15 +29,19 @@ export default function SignupPage() {
   // Start native sign-up (email + password) -> Entra sends an OTP email.
   async function startSignup(e: React.FormEvent) {
     e.preventDefault();
+    if (!firstName.trim() || !lastName.trim())
+      return setError("First and last name are required.");
     if (!email) return setError("Email is required.");
     if (password.length < 8)
       return setError("Password must be at least 8 characters.");
     setError(null);
     setLoading(true);
+    // first + last become the Entra display name (and our stored name).
+    const displayName = `${firstName} ${lastName}`.trim();
     const { ok, data, error } = await postJson<{
       continuationToken: string;
       target: string | null;
-    }>("/api/auth/signup", { step: "start", email, password });
+    }>("/api/auth/signup", { step: "start", email, password, displayName });
     setLoading(false);
     if (!ok || !data) return setError(error);
     setContinuationToken(data.continuationToken);
@@ -52,6 +58,9 @@ export default function SignupPage() {
       continuationToken,
       otp,
       password,
+      first_name: firstName,
+      last_name: lastName,
+      name: `${firstName} ${lastName}`.trim(),
     });
     setLoading(false);
     if (!ok) return setError(error);
@@ -114,6 +123,22 @@ export default function SignupPage() {
     >
       <form onSubmit={startSignup} className="space-y-4">
         <FormError message={error} />
+        <Text
+          id="first_name"
+          label="First name"
+          required
+          autoComplete="given-name"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+        />
+        <Text
+          id="last_name"
+          label="Last name"
+          required
+          autoComplete="family-name"
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+        />
         <Text
           id="email"
           label="Email"

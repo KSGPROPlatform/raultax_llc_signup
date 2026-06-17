@@ -142,3 +142,40 @@ export const saveCompany = (oid: string, c: CompanyInput) =>
   saveRow<Company>("companies", oid, c);
 export const deleteCompany = (oid: string, id: number) =>
   deleteRow("companies", oid, id);
+
+// ---- The signed-in user's own saved personal profile ----
+// Reads the user's raul_tax_users row via the manageUsers function (scoped to
+// the caller's oid by the /api/profile/personal route) so the onboarding
+// Personal-info step can pre-fill first/last (captured at sign-up) + the rest.
+export type SavedProfile = {
+  first_name: string | null;
+  middle_name: string | null;
+  last_name: string | null;
+  date_of_birth: string | null;
+  marital_status: string | null;
+  filing_status: string | null;
+  job_title: string | null;
+  phone_number: string | null;
+  ssn: string | null;
+  street_address: string | null;
+  city: string | null;
+  state_province: string | null;
+  postal_code: string | null;
+} | null;
+
+export async function getUserProfile(oid: string): Promise<SavedProfile> {
+  if (!base) return null;
+  try {
+    const res = await fetch(fnUrl("manageUsers", { oid }), {
+      headers: APP_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { user?: SavedProfile };
+    return data.user ?? null;
+  } catch (err) {
+    console.error("getUserProfile failed:", err);
+    return null;
+  }
+}

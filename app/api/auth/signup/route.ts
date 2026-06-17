@@ -19,16 +19,20 @@ export async function POST(request: Request) {
 
   try {
     if (body.step === "start") {
-      const { email, password } = body;
+      const { email, password, displayName } = body;
       if (!email || !password) {
         return NextResponse.json(
           { error: "Email and password are required." },
           { status: 400 },
         );
       }
-      // Sign-up collects only email + password. The name and rich profile are
-      // gathered later (Personal info is the first onboarding step).
-      const ct = await na.signupStart(email, password);
+      // first + last name become the Entra display name (shown in the external-ID
+      // portal). The rest of the profile is collected later in onboarding.
+      const ct = await na.signupStart(
+        email,
+        password,
+        displayName ? { displayName } : undefined,
+      );
       const challenge = await na.signupChallenge(ct);
       return NextResponse.json({
         continuationToken: challenge.continuationToken,
@@ -38,7 +42,7 @@ export async function POST(request: Request) {
     }
 
     if (body.step === "verify") {
-      const { continuationToken, otp, password } = body;
+      const { continuationToken, otp, password, first_name, last_name, name } = body;
       if (!continuationToken || !otp) {
         return NextResponse.json(
           { error: "The verification code is required." },
@@ -53,9 +57,11 @@ export async function POST(request: Request) {
         if (resp.error === "credential_required" && resp.continuation_token && password) {
           resp = await na.signupContinuePassword(resp.continuation_token, password);
         } else if (resp.error === "attributes_required" && resp.continuation_token) {
-          // No attributes are collected at sign-up (name comes later in
-          // onboarding), so satisfy the prompt with an empty set.
-          resp = await na.signupContinueAttributes(resp.continuation_token, {});
+          // Provide the display name (first + last) if Entra requires attributes.
+          resp = await na.signupContinueAttributes(
+            resp.continuation_token,
+            name ? { displayName: name } : {},
+          );
         } else {
           break;
         }
@@ -68,14 +74,17 @@ export async function POST(request: Request) {
       }
 
       const claims = await na.exchangeContinuationToken(resp.continuation_token);
-      // Create the user row (and resolve the role) with no profile yet — the
-      // name stays empty until Personal info is completed in onboarding.
-      const { role, ownsEstablishment } = await upsertUser(claims);
-      // A brand-new account always starts with onboarding incomplete, regardless
-      // of what the upsert echoes back.
+      // Store the name (first + last) now so the dashboard greeting + Entra
+      // display name show it immediately; the rest of the profile (and the
+      // pre-filled name fields) come from the Personal info onboarding step.
+      const fullName = (name || claims.name || "").trim();
+      const { role, ownsEstablishment } = await upsertUser(
+        { ...claims, name: fullName },
+        { first_name, last_name },
+      );
       const user = {
         ...claims,
-        name: claims.name || "",
+        name: fullName,
         role,
         onboardingComplete: false,
         ownsEstablishment,
