@@ -66,13 +66,13 @@ export function isAdminApiConfigured(): boolean {
 export async function getAdminOverview(): Promise<AdminUserRow[]> {
   if (!base) return [];
   try {
-    const res = await fetch(fnUrl("adminUsers"), {
+    const res = await fetch(fnUrl("manageUsers"), {
       headers: APP_HEADERS,
       cache: "no-store",
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) {
-      console.error("adminUsers overview returned", res.status);
+      console.error("manageUsers overview returned", res.status);
       return [];
     }
     const data = (await res.json()) as { users?: AdminUserRow[] };
@@ -90,7 +90,7 @@ export async function getAdminOverview(): Promise<AdminUserRow[]> {
 export async function getAdminUserDetail(oid: string): Promise<AdminUserDetail | null> {
   if (!base) return null;
   try {
-    const res = await fetch(fnUrl("adminUsers", { oid }), {
+    const res = await fetch(fnUrl("manageUsers", { oid }), {
       headers: APP_HEADERS,
       cache: "no-store",
       signal: AbortSignal.timeout(15000),

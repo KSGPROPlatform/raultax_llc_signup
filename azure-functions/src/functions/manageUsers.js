@@ -1,15 +1,20 @@
 const { app } = require("@azure/functions");
 const { sql, getPool } = require("../db");
 
-// GET /api/adminUsers            -> all users + per-user record counts (overview)
-// GET /api/adminUsers?oid=<oid>  -> one user's full profile + dependents, bank
-//                                   accounts, companies and files (detail)
+// GET /api/manageUsers            -> all users + per-user record counts (overview)
+// GET /api/manageUsers?oid=<oid>  -> one user's full profile + dependents, bank
+//                                    accounts, companies and files (detail)
+//
+// NB: the route must NOT start with "admin" — Azure Functions reserves the
+// `admin` route prefix and rejects such functions ("route conflicts with a
+// built-in route"), so this is named manageUsers, not adminUsers.
+//
 // raultax-specific. Called server-to-server by the admin-only app route, which
 // enforces the admin role; this function is only the data source.
-app.http("adminUsers", {
+app.http("manageUsers", {
   methods: ["GET"],
   authLevel: "function",
-  route: "adminUsers",
+  route: "manageUsers",
   handler: async (request, context) => {
     try {
       const pool = await getPool();
@@ -60,7 +65,7 @@ app.http("adminUsers", {
 
       return { status: 200, jsonBody: { users: result.recordset } };
     } catch (err) {
-      context.error("adminUsers failed", err);
+      context.error("manageUsers failed", err);
       return { status: 500, jsonBody: { error: "Internal error" } };
     }
   },
