@@ -94,7 +94,11 @@ export function DocumentVault() {
     setQrLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/uploads/handoff");
+      // Pass the real browser origin so the QR points at the public URL (SWA
+      // server headers aren't reliably the public domain).
+      const res = await fetch(
+        `/api/uploads/handoff?origin=${encodeURIComponent(window.location.origin)}`,
+      );
       if (res.ok) setQr(await res.json());
       else setError("Could not start the phone hand-off.");
     } catch {
