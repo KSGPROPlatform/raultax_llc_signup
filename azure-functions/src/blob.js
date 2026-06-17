@@ -1,32 +1,39 @@
 const { BlobServiceClient } = require("@azure/storage-blob");
 const zlib = require("node:zlib");
 
-// Blob helper for user files. Container + connection come from app settings.
-const CONTAINER = process.env.STORAGE_CONTAINER || "democontainer";
+// Blob helper for user files. The container is chosen PER CALL (from the app
+// registry); the connection comes from the STORAGE_CONNECTION app setting.
 
 let service;
-function container() {
+function serviceClient() {
   if (!service) {
     const conn = process.env.STORAGE_CONNECTION;
     if (!conn) throw new Error("Missing STORAGE_CONNECTION app setting");
     service = BlobServiceClient.fromConnectionString(conn);
   }
-  return service.getContainerClient(CONTAINER);
+  return service;
 }
 
-async function uploadBuffer(blobName, buffer, contentType) {
-  const blob = container().getBlockBlobClient(blobName);
+function container(name) {
+  // name comes from the server registry (validated in config.js); fall back to
+  // the legacy default so nothing breaks if it's omitted.
+  const c = name || process.env.STORAGE_CONTAINER || "democontainer";
+  return serviceClient().getContainerClient(c);
+}
+
+async function uploadBuffer(containerName, blobName, buffer, contentType) {
+  const blob = container(containerName).getBlockBlobClient(blobName);
   await blob.uploadData(buffer, {
     blobHTTPHeaders: { blobContentType: contentType || "application/octet-stream" },
   });
 }
 
-async function downloadBuffer(blobName) {
-  return container().getBlockBlobClient(blobName).downloadToBuffer();
+async function downloadBuffer(containerName, blobName) {
+  return container(containerName).getBlockBlobClient(blobName).downloadToBuffer();
 }
 
-async function deleteBlob(blobName) {
-  await container().getBlockBlobClient(blobName).deleteIfExists();
+async function deleteBlob(containerName, blobName) {
+  await container(containerName).getBlockBlobClient(blobName).deleteIfExists();
 }
 
 const gzip = (buf) => zlib.gzipSync(buf);

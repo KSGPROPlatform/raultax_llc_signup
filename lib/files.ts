@@ -5,6 +5,8 @@ import "server-only";
 // route handlers call these with the VERIFIED session oid.
 const base = process.env.PROFILE_API_URL;
 const key = process.env.PROFILE_API_KEY;
+// Tells the shared ksgpro-api which app's table/container to use.
+const APP_HEADERS = { "X-App-Id": "raultax" };
 
 export type UserFile = {
   id: number;
@@ -36,6 +38,7 @@ export async function listFiles(oid: string): Promise<UserFile[]> {
   if (!base) return [];
   try {
     const res = await fetch(fnUrl("listFiles", { oid }), {
+      headers: APP_HEADERS,
       cache: "no-store",
       signal: AbortSignal.timeout(10000),
     });
@@ -59,7 +62,7 @@ export async function uploadFile(
 ): Promise<UserFile> {
   const res = await fetch(fnUrl("uploadFile", { oid, filename, contentType }), {
     method: "POST",
-    headers: { "Content-Type": "application/octet-stream" },
+    headers: { ...APP_HEADERS, "Content-Type": "application/octet-stream" },
     body: bytes,
     signal: AbortSignal.timeout(120000),
   });
@@ -74,6 +77,7 @@ export async function uploadFile(
 export async function deleteFile(oid: string, id: number): Promise<void> {
   const res = await fetch(fnUrl("deleteFile", { oid, id }), {
     method: "DELETE",
+    headers: APP_HEADERS,
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error("Delete failed");
@@ -88,6 +92,7 @@ export async function viewFile(
   if (!base) return null;
   try {
     const res = await fetch(fnUrl("viewFile", { oid, id }), {
+      headers: APP_HEADERS,
       cache: "no-store",
       signal: AbortSignal.timeout(60000),
     });
