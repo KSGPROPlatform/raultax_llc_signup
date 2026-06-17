@@ -4,8 +4,8 @@ import { upsertUser } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 
 // POST /api/auth/signup
-//   step "start":  { email, password, name? }  -> sends OTP, returns continuationToken
-//   step "verify": { continuationToken, otp, password, name? } -> creates user, signs in
+//   step "start":  { email, password }  -> sends OTP, returns continuationToken
+//   step "verify": { continuationToken, otp, password } -> creates user, signs in
 //
 // The continuation token round-trips to the client between the two steps (it's a
 // short-lived flow token, not a session). The session cookie is set only at the
@@ -19,19 +19,16 @@ export async function POST(request: Request) {
 
   try {
     if (body.step === "start") {
-      const { email, password, displayName } = body;
+      const { email, password } = body;
       if (!email || !password) {
         return NextResponse.json(
           { error: "Email and password are required." },
           { status: 400 },
         );
       }
-      // Set the Entra displayName (first + last); the rich profile stays in our DB.
-      const ct = await na.signupStart(
-        email,
-        password,
-        displayName ? { displayName } : undefined,
-      );
+      // Sign-up collects only email + password. The name and rich profile are
+      // gathered later (Personal info is the first onboarding step).
+      const ct = await na.signupStart(email, password);
       const challenge = await na.signupChallenge(ct);
       return NextResponse.json({
         continuationToken: challenge.continuationToken,
@@ -41,7 +38,7 @@ export async function POST(request: Request) {
     }
 
     if (body.step === "verify") {
-      const { continuationToken, otp, password, name, profile } = body;
+      const { continuationToken, otp, password } = body;
       if (!continuationToken || !otp) {
         return NextResponse.json(
           { error: "The verification code is required." },
@@ -56,10 +53,9 @@ export async function POST(request: Request) {
         if (resp.error === "credential_required" && resp.continuation_token && password) {
           resp = await na.signupContinuePassword(resp.continuation_token, password);
         } else if (resp.error === "attributes_required" && resp.continuation_token) {
-          resp = await na.signupContinueAttributes(
-            resp.continuation_token,
-            name ? { displayName: name } : {},
-          );
+          // No attributes are collected at sign-up (name comes later in
+          // onboarding), so satisfy the prompt with an empty set.
+          resp = await na.signupContinueAttributes(resp.continuation_token, {});
         } else {
           break;
         }
@@ -72,13 +68,18 @@ export async function POST(request: Request) {
       }
 
       const claims = await na.exchangeContinuationToken(resp.continuation_token);
-      // Native sign-ups have no Entra displayName, so use the name the user
-      // typed (claims.name would be empty/"unknown").
-      const named = { ...claims, name: name || claims.name };
-      // A brand-new account always starts the onboarding journey, regardless of
-      // what the upsert echoes back.
-      const { role, ownsEstablishment } = await upsertUser(named, profile);
-      const user = { ...named, role, onboardingComplete: false, ownsEstablishment };
+      // Create the user row (and resolve the role) with no profile yet — the
+      // name stays empty until Personal info is completed in onboarding.
+      const { role, ownsEstablishment } = await upsertUser(claims);
+      // A brand-new account always starts with onboarding incomplete, regardless
+      // of what the upsert echoes back.
+      const user = {
+        ...claims,
+        name: claims.name || "",
+        role,
+        onboardingComplete: false,
+        ownsEstablishment,
+      };
       const res = NextResponse.json({ ok: true, user });
       res.cookies.set(SESSION_COOKIE, await encryptSession(user), sessionCookieOptions());
       return res;

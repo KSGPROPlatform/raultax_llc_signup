@@ -42,7 +42,11 @@ export default async function UserDashboardPage() {
         </p>
       </header>
 
-      <ProfileChecklist ownsEstablishment={user.ownsEstablishment} />
+      <ProfileChecklist
+        onboardingComplete={user.onboardingComplete}
+        personalInfoDone={Boolean(user.name)}
+        ownsEstablishment={user.ownsEstablishment}
+      />
 
       {/* Profile */}
       <section className={`${cardClass} p-6`}>

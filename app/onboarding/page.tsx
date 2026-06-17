@@ -3,13 +3,22 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
-import { buttonClass } from "@/components/auth/AuthShell";
+import { buttonClass, FormError } from "@/components/auth/AuthShell";
+import {
+  PersonalInfoForm,
+  type PersonalInfoValues,
+} from "@/components/profile/PersonalInfoForm";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
 import { DocumentVault } from "@/components/documents/DocumentVault";
+import { postJson } from "@/lib/api";
 
 const STEPS = [
+  {
+    title: "Personal info",
+    subtitle: "Tell us about yourself so we can prepare your return.",
+  },
   {
     title: "Your dependents",
     subtitle: "Add anyone you support. Skip if you have none.",
@@ -36,7 +45,22 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [finishing, setFinishing] = useState(false);
+  const [personal, setPersonal] = useState<Partial<PersonalInfoValues>>({});
+  const [savingPersonal, setSavingPersonal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const last = STEPS.length - 1;
+
+  // Step 0 "Continue" is the PersonalInfoForm's own submit button. Save to the
+  // DB, remember the values (so re-visiting shows them), then advance.
+  async function savePersonal(values: PersonalInfoValues) {
+    setError(null);
+    setSavingPersonal(true);
+    const { ok, error } = await postJson("/api/profile/personal", values);
+    setSavingPersonal(false);
+    if (!ok) return setError(error);
+    setPersonal(values);
+    setStep((s) => Math.min(last, s + 1));
+  }
 
   async function finish() {
     setFinishing(true);
@@ -70,9 +94,13 @@ export default function OnboardingPage() {
           {step < last && (
             <button
               type="button"
-              onClick={finish}
-              disabled={finishing}
-              className="text-xs font-medium text-zinc-500 hover:underline disabled:opacity-50 dark:text-zinc-400"
+              onClick={() => {
+                // Optional flow: just return to the dashboard WITHOUT marking
+                // onboarding complete, so the "complete your profile" nudge stays.
+                router.push("/dashboard");
+                router.refresh();
+              }}
+              className="text-xs font-medium text-zinc-500 hover:underline dark:text-zinc-400"
             >
               Skip for now
             </button>
@@ -99,11 +127,24 @@ export default function OnboardingPage() {
           </p>
 
           <div className="mt-6">
-            {step === 0 && <DependentsSection />}
-            {step === 1 && <BankSection />}
-            {step === 2 && <CompaniesSection />}
-            {step === 3 && <DocumentVault />}
-            {step === 4 && (
+            {step === 0 && (
+              <>
+                <div className="mb-4">
+                  <FormError message={error} />
+                </div>
+                <PersonalInfoForm
+                  initial={personal}
+                  busy={savingPersonal}
+                  submitLabel="Save & continue"
+                  onSubmit={savePersonal}
+                />
+              </>
+            )}
+            {step === 1 && <DependentsSection />}
+            {step === 2 && <BankSection />}
+            {step === 3 && <CompaniesSection />}
+            {step === 4 && <DocumentVault />}
+            {step === 5 && (
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
                 Everything is saved as you go. Click{" "}
                 <span className="font-medium text-zinc-900 dark:text-zinc-50">Finish</span>{" "}
@@ -113,9 +154,11 @@ export default function OnboardingPage() {
             )}
           </div>
 
-          {/* Nav */}
-          <div className="mt-8 flex gap-2">
-            {step > 0 && (
+          {/* Nav — the Personal info step (0) uses the form's own submit for
+              "Continue", so we only render the generic footer there if a Back
+              button is needed (it isn't on the first step). */}
+          {step > 0 && (
+            <div className="mt-8 flex gap-2">
               <button
                 type="button"
                 onClick={() => setStep((s) => Math.max(0, s - 1))}
@@ -123,34 +166,34 @@ export default function OnboardingPage() {
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </button>
-            )}
-            {step < last ? (
-              <button
-                type="button"
-                onClick={() => setStep((s) => Math.min(last, s + 1))}
-                className={`${buttonClass} flex flex-1 items-center justify-center gap-1.5`}
-              >
-                Continue <ArrowRight className="h-4 w-4" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={finish}
-                disabled={finishing}
-                className={`${buttonClass} flex flex-1 items-center justify-center gap-1.5`}
-              >
-                {finishing ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" /> Finishing…
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-4 w-4" /> Finish
-                  </>
-                )}
-              </button>
-            )}
-          </div>
+              {step < last ? (
+                <button
+                  type="button"
+                  onClick={() => setStep((s) => Math.min(last, s + 1))}
+                  className={`${buttonClass} flex flex-1 items-center justify-center gap-1.5`}
+                >
+                  Continue <ArrowRight className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={finish}
+                  disabled={finishing}
+                  className={`${buttonClass} flex flex-1 items-center justify-center gap-1.5`}
+                >
+                  {finishing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Finishing…
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4" /> Finish
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </main>

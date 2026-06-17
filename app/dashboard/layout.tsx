@@ -12,9 +12,8 @@ export default async function DashboardLayout({
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
-  // New/unfinished users complete the onboarding journey before the dashboard.
-  // Admins manage the platform and skip the tax-profile journey.
-  if (user.role !== "admin" && !user.onboardingComplete) redirect("/onboarding");
+  // Onboarding is optional and invited from the dashboard (see ProfileChecklist),
+  // so we no longer force unfinished users into /onboarding here.
 
   return (
     <DashboardShell
