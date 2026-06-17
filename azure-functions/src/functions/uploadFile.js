@@ -30,6 +30,7 @@ app.http("uploadFile", {
       const filename = request.query.get("filename") || "file";
       const contentType =
         request.query.get("contentType") || "application/octet-stream";
+      const docType = request.query.get("docType") || null; // category (Form 5); null = uncategorised
       if (!oid) return { status: 400, jsonBody: { error: "oid is required" } };
 
       const raw = Buffer.from(await request.arrayBuffer());
@@ -61,13 +62,14 @@ app.http("uploadFile", {
         .input("ctype", sql.NVarChar(128), contentType)
         .input("size", sql.BigInt, sizeBytes)
         .input("stored", sql.BigInt, storedBytes)
-        .input("comp", sql.Bit, compress ? 1 : 0).query(`
+        .input("comp", sql.Bit, compress ? 1 : 0)
+        .input("docType", sql.NVarChar(64), docType).query(`
           INSERT INTO ${cfg.filesTable}
-            (owner_oid, blob_name, original_name, content_type, size_bytes, stored_bytes, is_compressed)
+            (owner_oid, blob_name, original_name, content_type, size_bytes, stored_bytes, is_compressed, doc_type)
           OUTPUT inserted.id, inserted.owner_oid, inserted.blob_name,
                  inserted.original_name, inserted.content_type, inserted.size_bytes,
-                 inserted.stored_bytes, inserted.is_compressed, inserted.uploaded_at
-          VALUES (@oid, @blob, @name, @ctype, @size, @stored, @comp);
+                 inserted.stored_bytes, inserted.is_compressed, inserted.doc_type, inserted.uploaded_at
+          VALUES (@oid, @blob, @name, @ctype, @size, @stored, @comp, @docType);
         `);
 
       return { status: 200, jsonBody: result.recordset[0] };

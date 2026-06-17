@@ -8,9 +8,9 @@ import {
   FormError,
   buttonClass,
   fieldClass,
-  labelClass,
   linkClass,
 } from "@/components/auth/AuthShell";
+import { Field as Text, SelectField as Select } from "@/components/forms/Field";
 import { postJson } from "@/lib/api";
 
 const FILING_STATUS = [
@@ -152,7 +152,8 @@ export default function SignupPage() {
     });
     setLoading(false);
     if (!ok) return setError(error);
-    router.push("/dashboard");
+    // New accounts start the onboarding journey (forms 2-4) before the dashboard.
+    router.push("/onboarding");
     router.refresh();
   }
 
@@ -274,68 +275,5 @@ export default function SignupPage() {
         </div>
       </form>
     </AuthShell>
-  );
-}
-
-function Text({
-  id,
-  label,
-  hint,
-  required,
-  className,
-  ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & {
-  id: string;
-  label: string;
-  hint?: string;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className={labelClass}>
-        {label}
-        {required && <span className="text-amber-500"> *</span>}
-      </label>
-      <input id={id} required={required} className={className ?? fieldClass} {...props} />
-      {hint && <p className="text-xs text-zinc-400">{hint}</p>}
-    </div>
-  );
-}
-
-function Select({
-  id,
-  label,
-  options,
-  value,
-  onChange,
-  required,
-}: {
-  id: string;
-  label: string;
-  options: string[];
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
-  required?: boolean;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label htmlFor={id} className={labelClass}>
-        {label}
-        {required && <span className="text-amber-500"> *</span>}
-      </label>
-      <select
-        id={id}
-        value={value}
-        onChange={onChange}
-        required={required}
-        className={`${fieldClass} cursor-pointer`}
-      >
-        <option value="">Select…</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </div>
   );
 }

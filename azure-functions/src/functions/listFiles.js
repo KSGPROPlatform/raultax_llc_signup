@@ -27,7 +27,7 @@ app.http("listFiles", {
         .request()
         .input("oid", sql.NVarChar(64), oid).query(`
           SELECT id, owner_oid, blob_name, original_name, content_type,
-                 size_bytes, stored_bytes, is_compressed, uploaded_at
+                 size_bytes, stored_bytes, is_compressed, doc_type, uploaded_at
           FROM ${cfg.filesTable}
           WHERE owner_oid = @oid
           ORDER BY uploaded_at DESC;

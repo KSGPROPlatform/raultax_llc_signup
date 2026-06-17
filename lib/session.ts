@@ -16,10 +16,14 @@ export type AuthClaims = {
 
 export type Role = "admin" | "user";
 
-// What we keep in the session cookie: the claims plus our app-managed role
+// What we keep in the session cookie: the claims plus our app-managed state
 // (resolved from Azure SQL via the upsertUser function on sign-in/sign-up).
+// `onboardingComplete` drives the post-sign-up /onboarding gate; it is re-minted
+// when the user finishes the onboarding journey.
 export type SessionUser = AuthClaims & {
   role: Role;
+  onboardingComplete: boolean;
+  ownsEstablishment: boolean;
 };
 
 let keyPromise: Promise<Uint8Array> | undefined;

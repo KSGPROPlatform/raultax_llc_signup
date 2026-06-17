@@ -38,7 +38,10 @@ app.http("upsertUser", {
         .input("street_address", sql.NVarChar(256), b.street_address ?? null)
         .input("city", sql.NVarChar(128), b.city ?? null)
         .input("state_province", sql.NVarChar(128), b.state_province ?? null)
-        .input("postal_code", sql.NVarChar(32), b.postal_code ?? null).query(`
+        .input("postal_code", sql.NVarChar(32), b.postal_code ?? null)
+        // Onboarding flags: undefined => null => COALESCE keeps the existing value.
+        .input("owns_establishment", sql.Bit, b.owns_establishment == null ? null : b.owns_establishment ? 1 : 0)
+        .input("onboarding_completed", sql.Bit, b.onboarding_completed == null ? null : b.onboarding_completed ? 1 : 0).query(`
           MERGE raul_tax_users AS target
           USING (SELECT @oid AS entra_object_id) AS source
             ON target.entra_object_id = source.entra_object_id
@@ -59,12 +62,15 @@ app.http("upsertUser", {
               city           = COALESCE(@city, city),
               state_province = COALESCE(@state_province, state_province),
               postal_code    = COALESCE(@postal_code, postal_code),
+              owns_establishment   = COALESCE(@owns_establishment, owns_establishment),
+              onboarding_completed = COALESCE(@onboarding_completed, onboarding_completed),
               updated_at = SYSUTCDATETIME()
           WHEN NOT MATCHED THEN
             INSERT (entra_object_id, email, name, role,
                     first_name, last_name, middle_name, date_of_birth, filing_status,
                     marital_status, job_title, phone_number, ssn,
                     street_address, city, state_province, postal_code,
+                    owns_establishment, onboarding_completed,
                     created_at, updated_at)
             VALUES (@oid, @email, @name, 'user',
                     ISNULL(@first_name, ''), ISNULL(@last_name, ''), ISNULL(@middle_name, ''),
@@ -73,9 +79,11 @@ app.http("upsertUser", {
                     ISNULL(@phone_number, ''), ISNULL(@ssn, ''),
                     ISNULL(@street_address, ''), ISNULL(@city, ''),
                     ISNULL(@state_province, ''), ISNULL(@postal_code, ''),
+                    ISNULL(@owns_establishment, 0), ISNULL(@onboarding_completed, 0),
                     SYSUTCDATETIME(), SYSUTCDATETIME())
           OUTPUT inserted.id, inserted.entra_object_id, inserted.email,
-                 inserted.name, inserted.role;
+                 inserted.name, inserted.role,
+                 inserted.owns_establishment, inserted.onboarding_completed;
         `);
 
       return { status: 200, jsonBody: result.recordset[0] };

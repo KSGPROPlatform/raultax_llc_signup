@@ -20,8 +20,8 @@ export async function POST(request: Request) {
 
   try {
     const claims = await na.signin(email, password);
-    const { role } = await upsertUser(claims);
-    const user = { ...claims, role };
+    const { role, onboardingComplete, ownsEstablishment } = await upsertUser(claims);
+    const user = { ...claims, role, onboardingComplete, ownsEstablishment };
     const res = NextResponse.json({ ok: true, user });
     res.cookies.set(SESSION_COOKIE, await encryptSession(user), sessionCookieOptions());
     return res;

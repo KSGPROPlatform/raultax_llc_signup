@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listFiles, uploadFile, isFilesConfigured } from "@/lib/files";
+import { listFiles, uploadFile, saveDocument, isFilesConfigured } from "@/lib/files";
+import { isKnownDocType } from "@/lib/docTypes";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB app-side cap
 
@@ -35,12 +36,13 @@ export async function POST(request: Request) {
     }
 
     const bytes = await file.arrayBuffer();
-    const saved = await uploadFile(
-      user.sub,
-      file.name,
-      file.type || "application/octet-stream",
-      bytes,
-    );
+    const contentType = file.type || "application/octet-stream";
+    // Optional document category (Form 5). Single-file slots replace via saveDocument.
+    const docTypeRaw = form.get("docType");
+    const docType = typeof docTypeRaw === "string" && isKnownDocType(docTypeRaw) ? docTypeRaw : null;
+    const saved = docType
+      ? await saveDocument(user.sub, file.name, contentType, bytes, docType)
+      : await uploadFile(user.sub, file.name, contentType, bytes);
     return NextResponse.json({ file: saved }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed.";

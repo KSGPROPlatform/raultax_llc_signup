@@ -75,8 +75,10 @@ export async function POST(request: Request) {
       // Native sign-ups have no Entra displayName, so use the name the user
       // typed (claims.name would be empty/"unknown").
       const named = { ...claims, name: name || claims.name };
-      const { role } = await upsertUser(named, profile);
-      const user = { ...named, role };
+      // A brand-new account always starts the onboarding journey, regardless of
+      // what the upsert echoes back.
+      const { role, ownsEstablishment } = await upsertUser(named, profile);
+      const user = { ...named, role, onboardingComplete: false, ownsEstablishment };
       const res = NextResponse.json({ ok: true, user });
       res.cookies.set(SESSION_COOKIE, await encryptSession(user), sessionCookieOptions());
       return res;

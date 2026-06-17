@@ -19,24 +19,47 @@ export type Profile = {
   postal_code?: string;
 };
 
+// Onboarding-journey flags persisted on the user row (not part of the rich
+// Profile). Sent à la carte by the dashboard establishment toggle and the
+// "finish onboarding" route.
+export type UserFlags = {
+  owns_establishment?: boolean;
+  onboarding_completed?: boolean;
+};
+
+export type UpsertResult = {
+  role: Role;
+  onboardingComplete: boolean;
+  ownsEstablishment: boolean;
+};
+
 // Mirrors the signed-in user into Azure SQL by calling our standalone
-// `upsertUser` Azure Function server-to-server, and returns the resolved role.
+// `upsertUser` Azure Function server-to-server, and returns the resolved role +
+// onboarding state.
 //
 // Resilient by design: if the function/DB is unconfigured or unreachable, we log
-// and fall back to role "user" so authentication NEVER breaks because of the
-// profile store.
+// and fall back so authentication NEVER breaks because of the profile store.
+// On failure we report `onboardingComplete: true` so a backend blip can't trap a
+// user behind the onboarding gate (the dashboard checklist still nudges them).
 export async function upsertUser(
   claims: AuthClaims,
   profile?: Profile,
-): Promise<{ role: Role }> {
+  flags?: UserFlags,
+): Promise<UpsertResult> {
+  const FALLBACK: UpsertResult = {
+    role: "user",
+    onboardingComplete: true,
+    ownsEstablishment: false,
+  };
+
   // NB: not FUNCTIONS_* — Azure Static Web Apps reserves that prefix.
   const base = process.env.PROFILE_API_URL;
   const key = process.env.PROFILE_API_KEY;
 
-  if (!base || !claims.sub) return { role: "user" };
+  if (!base || !claims.sub) return FALLBACK;
 
   try {
-    // Our deployed Azure Function that MERGE-upserts the user and returns role.
+    // Our deployed Azure Function that MERGE-upserts the user and returns state.
     const url =
       `${base.replace(/\/$/, "")}/upsertUser` +
       (key ? `?code=${encodeURIComponent(key)}` : "");
@@ -49,6 +72,7 @@ export async function upsertUser(
         email: claims.email,
         name: claims.name,
         ...(profile ?? {}),
+        ...(flags ?? {}),
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(10000),
@@ -56,13 +80,21 @@ export async function upsertUser(
 
     if (!res.ok) {
       console.error("upsertUser function returned", res.status);
-      return { role: "user" };
+      return FALLBACK;
     }
 
-    const data = (await res.json().catch(() => null)) as { role?: string } | null;
-    return { role: data?.role === "admin" ? "admin" : "user" };
+    const data = (await res.json().catch(() => null)) as {
+      role?: string;
+      onboarding_completed?: boolean | number;
+      owns_establishment?: boolean | number;
+    } | null;
+    return {
+      role: data?.role === "admin" ? "admin" : "user",
+      onboardingComplete: Boolean(data?.onboarding_completed),
+      ownsEstablishment: Boolean(data?.owns_establishment),
+    };
   } catch (err) {
     console.error("upsertUser failed:", err);
-    return { role: "user" };
+    return FALLBACK;
   }
 }

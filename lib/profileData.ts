@@ -1,0 +1,144 @@
+import "server-only";
+
+// Server-side client for the profile-form Azure Functions (dependents /
+// bankAccounts / companies) on ksgpro-api. Same base/key + X-App-Id as
+// lib/files.ts. The app's route handlers call these with the VERIFIED session oid.
+const base = process.env.PROFILE_API_URL;
+const key = process.env.PROFILE_API_KEY;
+const APP_HEADERS = { "X-App-Id": "raultax" };
+
+export function isProfileConfigured(): boolean {
+  return Boolean(base);
+}
+
+function fnUrl(
+  path: string,
+  params: Record<string, string | number | undefined> = {},
+) {
+  const url = new URL(`${(base ?? "").replace(/\/$/, "")}/${path}`);
+  if (key) url.searchParams.set("code", key);
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+  }
+  return url.toString();
+}
+
+// Rendered during SSR / called from route handlers — list never throws.
+async function listRows<T>(route: string, oid: string): Promise<T[]> {
+  if (!base) return [];
+  try {
+    const res = await fetch(fnUrl(route, { oid }), {
+      headers: APP_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) {
+      console.error(`${route} list returned`, res.status);
+      return [];
+    }
+    return (await res.json()) as T[];
+  } catch (err) {
+    console.error(`${route} list failed:`, err);
+    return [];
+  }
+}
+
+async function saveRow<T>(
+  route: string,
+  oid: string,
+  data: Record<string, unknown>,
+): Promise<T> {
+  const res = await fetch(fnUrl(route), {
+    method: "POST",
+    headers: { ...APP_HEADERS, "Content-Type": "application/json" },
+    body: JSON.stringify({ oid, ...data }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    const msg = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(msg.error ?? "Save failed");
+  }
+  return (await res.json()) as T;
+}
+
+async function deleteRow(route: string, oid: string, id: number): Promise<void> {
+  const res = await fetch(fnUrl(route, { oid, id }), {
+    method: "DELETE",
+    headers: APP_HEADERS,
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error("Delete failed");
+}
+
+// ---- Dependents (Form 2) ----
+export type Dependent = {
+  id: number;
+  owner_oid: string;
+  full_name: string;
+  ssn: string;
+  date_of_birth: string;
+  relationship: string;
+  created_at: string;
+  updated_at: string;
+};
+export type DependentInput = {
+  id?: number;
+  full_name: string;
+  ssn: string;
+  date_of_birth: string;
+  relationship: string;
+};
+export const listDependents = (oid: string) =>
+  listRows<Dependent>("dependents", oid);
+export const saveDependent = (oid: string, d: DependentInput) =>
+  saveRow<Dependent>("dependents", oid, d);
+export const deleteDependent = (oid: string, id: number) =>
+  deleteRow("dependents", oid, id);
+
+// ---- Bank accounts (Form 3) ----
+export type BankAccount = {
+  id: number;
+  owner_oid: string;
+  bank_name: string;
+  account_number: string;
+  routing_number: string;
+  created_at: string;
+  updated_at: string;
+};
+export type BankAccountInput = {
+  id?: number;
+  bank_name: string;
+  account_number: string;
+  routing_number: string;
+};
+export const listBankAccounts = (oid: string) =>
+  listRows<BankAccount>("bankAccounts", oid);
+export const saveBankAccount = (oid: string, b: BankAccountInput) =>
+  saveRow<BankAccount>("bankAccounts", oid, b);
+export const deleteBankAccount = (oid: string, id: number) =>
+  deleteRow("bankAccounts", oid, id);
+
+// ---- Companies (Form 4) ----
+export type Company = {
+  id: number;
+  owner_oid: string;
+  company_name: string;
+  ein: string;
+  activities: string;
+  business_expense: number | null;
+  created_at: string;
+  updated_at: string;
+};
+export type CompanyInput = {
+  id?: number;
+  company_name: string;
+  ein: string;
+  activities: string;
+  business_expense: number | null;
+};
+export const listCompanies = (oid: string) =>
+  listRows<Company>("companies", oid);
+export const saveCompany = (oid: string, c: CompanyInput) =>
+  saveRow<Company>("companies", oid, c);
+export const deleteCompany = (oid: string, id: number) =>
+  deleteRow("companies", oid, id);

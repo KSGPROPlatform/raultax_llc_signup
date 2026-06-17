@@ -48,8 +48,8 @@ export async function POST(request: Request) {
       // Try to sign the user straight in; if that fails they can log in manually.
       try {
         const claims = await na.exchangeContinuationToken(ct);
-        const { role } = await upsertUser(claims);
-        const user = { ...claims, role };
+        const { role, onboardingComplete, ownsEstablishment } = await upsertUser(claims);
+        const user = { ...claims, role, onboardingComplete, ownsEstablishment };
         const res = NextResponse.json({ ok: true, signedIn: true, user });
         res.cookies.set(SESSION_COOKIE, await encryptSession(user), sessionCookieOptions());
         return res;

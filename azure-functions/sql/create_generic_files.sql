@@ -11,6 +11,7 @@ CREATE TABLE <app>_files (
     size_bytes     BIGINT        NULL,          -- original size
     stored_bytes   BIGINT        NULL,          -- size in Blob (after gzip, if any)
     is_compressed  BIT           NOT NULL DEFAULT 0,
+    doc_type       NVARCHAR(64)  NULL,             -- optional category (Form 5)
     uploaded_at    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
     CONSTRAINT fk_<app>_files_user FOREIGN KEY (owner_oid)
         REFERENCES <app>_users(entra_object_id)

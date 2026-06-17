@@ -1,4 +1,5 @@
 import "server-only";
+import { isMultiple } from "./docTypes";
 
 // Server-side client for the file Azure Functions (uploadFile / listFiles /
 // viewFile / deleteFile) on ksgpro-api. Same base/key as upsertUser. The app's
@@ -17,6 +18,7 @@ export type UserFile = {
   size_bytes: number | null;
   stored_bytes: number | null;
   is_compressed: boolean;
+  doc_type: string | null;
   uploaded_at: string;
 };
 
@@ -59,19 +61,42 @@ export async function uploadFile(
   filename: string,
   contentType: string,
   bytes: ArrayBuffer,
+  docType?: string | null,
 ): Promise<UserFile> {
-  const res = await fetch(fnUrl("uploadFile", { oid, filename, contentType }), {
-    method: "POST",
-    headers: { ...APP_HEADERS, "Content-Type": "application/octet-stream" },
-    body: bytes,
-    signal: AbortSignal.timeout(120000),
-  });
+  const res = await fetch(
+    fnUrl("uploadFile", { oid, filename, contentType, docType: docType ?? undefined }),
+    {
+      method: "POST",
+      headers: { ...APP_HEADERS, "Content-Type": "application/octet-stream" },
+      body: bytes,
+      signal: AbortSignal.timeout(120000),
+    },
+  );
   if (!res.ok) {
     const msg = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(msg.error ?? "Upload failed");
   }
   const file = (await res.json()) as UserFile;
   return { ...file, is_compressed: Boolean(file.is_compressed) };
+}
+
+// Upload a categorised document (Form 5). For single-file slots (e.g. SSN copy,
+// ID front/back) the previous file of that type is removed so the slot holds
+// exactly one. Used by both the web vault and the mobile (QR) upload.
+export async function saveDocument(
+  oid: string,
+  filename: string,
+  contentType: string,
+  bytes: ArrayBuffer,
+  docType: string,
+): Promise<UserFile> {
+  const saved = await uploadFile(oid, filename, contentType, bytes, docType);
+  if (docType && !isMultiple(docType)) {
+    const all = await listFiles(oid);
+    const stale = all.filter((f) => f.doc_type === docType && f.id !== saved.id);
+    await Promise.all(stale.map((f) => deleteFile(oid, f.id).catch(() => {})));
+  }
+  return saved;
 }
 
 export async function deleteFile(oid: string, id: number): Promise<void> {
