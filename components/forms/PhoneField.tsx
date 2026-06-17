@@ -4,7 +4,12 @@ import { fieldClass, labelClass } from "@/components/auth/AuthShell";
 
 // Format up to 10 US digits progressively as `+1 (XXX) XXX-XXXX`.
 function formatUsPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "").slice(0, 10);
+  // Strip our own "+1 " display prefix FIRST so its digit isn't re-counted on
+  // every keystroke (that was turning input into a run of 1s). Then drop a
+  // pasted leading country-code 1, and keep the 10 national digits.
+  let digits = raw.replace(/^\s*\+1\s*/, "").replace(/\D/g, "");
+  if (digits.length > 10 && digits.startsWith("1")) digits = digits.slice(1);
+  digits = digits.slice(0, 10);
   if (!digits) return "";
   const area = digits.slice(0, 3);
   const prefix = digits.slice(3, 6);
