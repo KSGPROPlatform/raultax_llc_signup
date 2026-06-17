@@ -6,18 +6,16 @@ import { CheckCircle2, Circle, ArrowRight, X, Sparkles } from "lucide-react";
 
 type Props = {
   onboardingComplete: boolean;
-  personalInfoDone: boolean;
   ownsEstablishment: boolean;
 };
 
-type Counts = { bank: number; companies: number; dependents: number; files: number };
+type Counts = { bank: number; companies: number; files: number; personalDone: boolean };
 
 // Dashboard "Complete your profile" experience. Onboarding is now optional and
 // invited from here: we always show a persistent inline progress card, and —
 // while onboarding isn't finished — a one-time popup modal nudging the user in.
 export function ProfileChecklist({
   onboardingComplete,
-  personalInfoDone,
   ownsEstablishment,
 }: Props) {
   const [counts, setCounts] = useState<Counts | null>(null);
@@ -33,18 +31,22 @@ export function ProfileChecklist({
           .then((r) => (r.ok ? r.json() : {}))
           .catch(() => ({}));
       const len = (v: unknown) => (Array.isArray(v) ? v.length : 0);
-      const [b, c, d, f] = await Promise.all([
+      const [b, c, f, p] = await Promise.all([
         get("/api/bank-accounts"),
         get("/api/companies"),
-        get("/api/dependents"),
         get("/api/files"),
+        get("/api/profile/personal"),
       ]);
       if (active) {
+        // Personal info is "done" only once the onboarding step is saved — date
+        // of birth is collected there, not at sign-up — so a brand-new account
+        // that only has a name reads correctly as 0%.
+        const profile = (p.profile ?? {}) as Record<string, string>;
         setCounts({
           bank: len(b.rows),
           companies: len(c.rows),
-          dependents: len(d.rows),
           files: len(f.files),
+          personalDone: Boolean((profile.date_of_birth ?? "").trim()),
         });
       }
     })();
@@ -57,13 +59,13 @@ export function ProfileChecklist({
   if (!counts) return null;
 
   const items = [
-    { label: "Personal information", done: personalInfoDone },
+    { label: "Personal information", done: counts.personalDone },
     { label: "Bank information", done: counts.bank > 0 },
     {
-      // Business owners must add a company; otherwise the section is N/A and
-      // counts as done (same heuristic as before).
+      // "Done" only once a company is actually added; a no-business user reaches
+      // 100% by finishing onboarding (which flips the whole card to complete).
       label: ownsEstablishment ? "Company details" : "Business details",
-      done: !ownsEstablishment || counts.companies > 0,
+      done: counts.companies > 0,
     },
     { label: "Documents", done: counts.files > 0 },
   ];

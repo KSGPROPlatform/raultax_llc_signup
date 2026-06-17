@@ -44,7 +44,6 @@ export default async function UserDashboardPage() {
 
       <ProfileChecklist
         onboardingComplete={user.onboardingComplete}
-        personalInfoDone={Boolean(user.name)}
         ownsEstablishment={user.ownsEstablishment}
       />
 
