@@ -1,23 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2 } from "lucide-react";
+import { Building2, Pencil, Trash2 } from "lucide-react";
 import type { Company } from "@/lib/profileData";
 import { CompanyForm, type CompanyValues } from "@/components/profile/CompanyForm";
 import { Modal } from "@/components/dashboard/Modal";
+import { CompanyPnL } from "@/components/documents/CompanyPnL";
 import {
   AddButton,
-  ListContainer,
-  ListRow,
   SectionEmpty,
   SectionError,
   SectionSkeleton,
 } from "@/components/dashboard/sectionUI";
-
-function fmtMoney(n: number | null) {
-  if (n == null) return "—";
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
-}
 
 // Form 4 manager. Gated by the "do you own an establishment?" answer.
 // `initialOwns` seeds the answer from the session on the dashboard; the
@@ -171,18 +165,37 @@ export function CompaniesSection({ initialOwns }: { initialOwns?: boolean }) {
       {loading ? (
         <SectionSkeleton />
       ) : rows.length ? (
-        <ListContainer>
+        <div className="space-y-4">
           {rows.map((r) => (
-            <ListRow
+            <div
               key={r.id}
-              icon={Building2}
-              title={r.company_name || "—"}
-              subtitle={`EIN ${r.ein || "—"} · ${r.activities || "—"} · P/L ${fmtMoney(r.business_expense)}`}
-              onEdit={() => setEditing(r)}
-              onDelete={() => remove(r)}
-            />
+              className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+            >
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-zinc-900 dark:text-zinc-400">
+                  <Building2 className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    {r.company_name || "—"}
+                  </div>
+                  <div className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+                    EIN {r.ein || "—"} · {r.activities || "—"}
+                  </div>
+                </div>
+                <button type="button" onClick={() => setEditing(r)} aria-label="Edit company" className="grid h-8 w-8 place-items-center rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900">
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => remove(r)} aria-label="Delete company" className="grid h-8 w-8 place-items-center rounded-lg text-zinc-500 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400">
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="mt-3">
+                <CompanyPnL companyId={r.id} />
+              </div>
+            </div>
           ))}
-        </ListContainer>
+        </div>
       ) : (
         <SectionEmpty text="No companies added yet." />
       )}
@@ -210,10 +223,6 @@ export function CompaniesSection({ initialOwns }: { initialOwns?: boolean }) {
                     company_name: editing.company_name,
                     ein: editing.ein,
                     activities: editing.activities,
-                    business_expense:
-                      editing.business_expense == null
-                        ? ""
-                        : String(editing.business_expense),
                   }
                 : undefined
             }

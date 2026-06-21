@@ -134,7 +134,6 @@ export type CompanyInput = {
   company_name: string;
   ein: string;
   activities: string;
-  business_expense: number | null;
 };
 export const listCompanies = (oid: string) =>
   listRows<Company>("companies", oid);
@@ -142,6 +141,49 @@ export const saveCompany = (oid: string, c: CompanyInput) =>
   saveRow<Company>("companies", oid, c);
 export const deleteCompany = (oid: string, id: number) =>
   deleteRow("companies", oid, id);
+
+// ---- Company profit/loss line items (per company) ----
+export type CompanyLine = {
+  id: number;
+  owner_oid: string;
+  company_id: number;
+  kind: "income" | "expense";
+  category: string;
+  description: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+};
+export type CompanyLineInput = {
+  id?: number;
+  companyId: number;
+  kind: "income" | "expense";
+  category: string;
+  description: string;
+  amount: number;
+};
+export async function listCompanyLines(
+  oid: string,
+  companyId: number,
+): Promise<CompanyLine[]> {
+  if (!base) return [];
+  try {
+    const res = await fetch(fnUrl("companyLines", { oid, companyId }), {
+      headers: APP_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+    return (await res.json()) as CompanyLine[];
+  } catch (err) {
+    console.error("companyLines list failed:", err);
+    return [];
+  }
+}
+export const saveCompanyLine = (oid: string, line: CompanyLineInput) =>
+  saveRow<CompanyLine>("companyLines", oid, line);
+export const deleteCompanyLine = (oid: string, id: number) =>
+  deleteRow("companyLines", oid, id);
 
 // ---- Jobs (one user has many; W-2/1099 attach per job via file job_id) ----
 export type Job = {

@@ -53,7 +53,7 @@ app.http("companies", {
           const result = await req.input("id", sql.Int, Number(b.id)).query(`
             UPDATE raul_tax_companies
             SET company_name = @company_name, ein = @ein, activities = @activities,
-                business_expense = @business_expense, updated_at = SYSUTCDATETIME()
+                business_expense = COALESCE(@business_expense, business_expense), updated_at = SYSUTCDATETIME()
             ${OUTPUT}
             WHERE id = @id AND owner_oid = @oid;
           `);
@@ -79,6 +79,7 @@ app.http("companies", {
           .request()
           .input("oid", sql.NVarChar(64), oid)
           .input("id", sql.Int, id).query(`
+            DELETE FROM raul_tax_company_lines WHERE company_id = @id AND owner_oid = @oid;
             DELETE FROM raul_tax_companies WHERE id = @id AND owner_oid = @oid;
           `);
         return { status: 200, jsonBody: { ok: true } };
