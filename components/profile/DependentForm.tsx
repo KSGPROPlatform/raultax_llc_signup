@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Field, SelectField, FormButtons } from "@/components/forms/Field";
+import { SsnField } from "@/components/forms/SsnField";
 
 const RELATIONSHIPS = ["Spouse", "Child", "Parent", "Sibling", "Other dependent"];
 
@@ -39,6 +40,8 @@ export function DependentForm({
     (k: keyof DependentValues) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setV((p) => ({ ...p, [k]: e.target.value }));
+  const setVal = (k: keyof DependentValues) => (value: string) =>
+    setV((p) => ({ ...p, [k]: value }));
 
   return (
     <form
@@ -49,7 +52,7 @@ export function DependentForm({
       className="space-y-4"
     >
       <Field id="dep_full_name" label="Full name" required maxLength={256} value={v.full_name} onChange={set("full_name")} autoComplete="off" />
-      <Field id="dep_ssn" label="Social Security number" required maxLength={32} value={v.ssn} onChange={set("ssn")} autoComplete="off" hint="Stored securely on your account." />
+      <SsnField id="dep_ssn" label="Social Security number" required value={v.ssn} onChange={setVal("ssn")} hint="Stored securely on your account." />
       <Field id="dep_dob" label="Date of birth" placeholder="DD/MM/YY" required maxLength={32} value={v.date_of_birth} onChange={set("date_of_birth")} autoComplete="off" />
       <SelectField id="dep_rel" label="Relationship" required value={v.relationship} onChange={set("relationship")} options={RELATIONSHIPS} />
       <FormButtons busy={busy} submitLabel={submitLabel} onCancel={onCancel} />
