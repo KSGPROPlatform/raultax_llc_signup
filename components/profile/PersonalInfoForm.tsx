@@ -27,7 +27,6 @@ export type PersonalInfoValues = {
   date_of_birth: string;
   marital_status: string;
   filing_status: string;
-  job_title: string;
   phone_number: string;
   ssn: string;
   street_address: string;
@@ -43,7 +42,6 @@ const EMPTY: PersonalInfoValues = {
   date_of_birth: "",
   marital_status: "",
   filing_status: "",
-  job_title: "",
   phone_number: "",
   ssn: "",
   street_address: "",
@@ -132,15 +130,6 @@ export function PersonalInfoForm({
         value={v.filing_status}
         onChange={setValue("filing_status")}
         options={FILING_STATUS}
-      />
-      <Field
-        id="pi_job_title"
-        label="Job title"
-        required
-        maxLength={256}
-        value={v.job_title}
-        onChange={setText("job_title")}
-        autoComplete="organization-title"
       />
       <PhoneField
         id="pi_phone_number"
