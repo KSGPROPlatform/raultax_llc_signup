@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { ROUTING } from "@/lib/routingNumbers";
 
 // GET /api/bank-lookup?routing=XXXXXXXXX — resolve a US routing number to its
-// bank name via a free public lookup. Server-side (avoids CORS, keeps it
-// controlled). Routing numbers are PUBLIC (printed on every check); the account
-// number is never involved here. Always returns { bankName: string | null }.
+// bank name. Resolved against the BUNDLED Federal Reserve FedACH directory
+// (public domain) — no external call, so it works reliably offline. Routing
+// numbers are public; the account number is never involved here.
+// Always returns { bankName: string | null }.
 
-// ABA checksum — cheap validity check so we don't call out on obvious junk.
+// ABA checksum — quick validity guard before the lookup.
 function isValidAba(r: string): boolean {
   if (!/^\d{9}$/.test(r)) return false;
   const d = r.split("").map(Number);
@@ -25,19 +27,5 @@ export async function GET(request: Request) {
   );
   if (!isValidAba(routing)) return NextResponse.json({ bankName: null });
 
-  try {
-    const res = await fetch(
-      `https://www.routingnumbers.com/api/name.json?rn=${routing}`,
-      { signal: AbortSignal.timeout(5000), cache: "no-store" },
-    );
-    if (!res.ok) return NextResponse.json({ bankName: null });
-    const data = (await res.json().catch(() => ({}))) as {
-      code?: number;
-      name?: string;
-    };
-    const bankName = data?.code === 200 && data?.name ? String(data.name) : null;
-    return NextResponse.json({ bankName });
-  } catch {
-    return NextResponse.json({ bankName: null });
-  }
+  return NextResponse.json({ bankName: ROUTING[routing] ?? null });
 }
