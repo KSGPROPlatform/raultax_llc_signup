@@ -8,6 +8,7 @@ import { US_STATES } from "@/lib/usStates";
 import { PhoneField } from "@/components/forms/PhoneField";
 import { SsnField } from "@/components/forms/SsnField";
 import { DateField } from "@/components/forms/DateField";
+import { DocUpload } from "@/components/documents/DocUpload";
 
 const MARITAL_STATUS = ["Single", "Married", "Divorced", "Widowed", "Separated"];
 const FILING_STATUS = [
@@ -156,6 +157,7 @@ export function PersonalInfoForm({
         value={v.ssn}
         onChange={setValue("ssn")}
       />
+      <DocUpload docType="ssn_copy" label="SSN document" />
       <Field
         id="pi_street_address"
         label="Street address"

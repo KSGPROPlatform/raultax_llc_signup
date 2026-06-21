@@ -9,7 +9,8 @@ import {
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { RoleBadge } from "@/components/dashboard/RoleBadge";
-import { DocumentVault } from "@/components/documents/DocumentVault";
+import { JobsSection } from "@/components/dashboard/JobsSection";
+import { DocUpload } from "@/components/documents/DocUpload";
 import { ProfileChecklist } from "@/components/dashboard/ProfileChecklist";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
@@ -116,12 +117,20 @@ export default async function UserDashboardPage() {
         <CompaniesSection initialOwns={user.ownsEstablishment} />
       </section>
 
-      {/* Documents */}
-      <section id="documents" className="scroll-mt-6 space-y-4">
+      {/* Jobs */}
+      <section id="jobs" className="scroll-mt-6 space-y-4">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Documents
+          Jobs
         </h2>
-        <DocumentVault />
+        <JobsSection />
+      </section>
+
+      {/* SSN document */}
+      <section id="ssn-document" className="scroll-mt-6 space-y-4">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+          SSN document
+        </h2>
+        <DocUpload docType="ssn_copy" label="SSN document" />
       </section>
     </div>
   );

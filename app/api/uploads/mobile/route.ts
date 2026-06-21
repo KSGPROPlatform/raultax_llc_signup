@@ -43,14 +43,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "File too large (max 25 MB)." }, { status: 413 });
     }
 
+    // The token's target slot wins (a phone can only upload where the QR was
+    // for); fall back to the form's docType for a generic token.
     const docTypeRaw = form.get("docType");
-    const docType =
+    const formDocType =
       typeof docTypeRaw === "string" && isKnownDocType(docTypeRaw) ? docTypeRaw : null;
+    const docType = auth.docType ?? formDocType;
+    const jobId = auth.jobId ?? null;
 
     const bytes = await file.arrayBuffer();
     const contentType = file.type || "application/octet-stream";
     const saved = docType
-      ? await saveDocument(auth.oid, file.name, contentType, bytes, docType)
+      ? await saveDocument(auth.oid, file.name, contentType, bytes, docType, jobId)
       : await uploadFile(auth.oid, file.name, contentType, bytes);
     return NextResponse.json({ file: saved }, { status: 201 });
   } catch (err) {

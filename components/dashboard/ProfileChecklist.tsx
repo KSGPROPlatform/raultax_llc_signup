@@ -9,7 +9,7 @@ type Props = {
   ownsEstablishment: boolean;
 };
 
-type Counts = { bank: number; companies: number; files: number; personalDone: boolean };
+type Counts = { bank: number; companies: number; jobs: number; personalDone: boolean };
 
 // Dashboard "Complete your profile" experience. Onboarding is now optional and
 // invited from here: we always show a persistent inline progress card, and —
@@ -31,10 +31,10 @@ export function ProfileChecklist({
           .then((r) => (r.ok ? r.json() : {}))
           .catch(() => ({}));
       const len = (v: unknown) => (Array.isArray(v) ? v.length : 0);
-      const [b, c, f, p] = await Promise.all([
+      const [b, c, j, p] = await Promise.all([
         get("/api/bank-accounts"),
         get("/api/companies"),
-        get("/api/files"),
+        get("/api/jobs"),
         get("/api/profile/personal"),
       ]);
       if (active) {
@@ -45,7 +45,7 @@ export function ProfileChecklist({
         setCounts({
           bank: len(b.rows),
           companies: len(c.rows),
-          files: len(f.files),
+          jobs: len(j.rows),
           personalDone: Boolean((profile.date_of_birth ?? "").trim()),
         });
       }
@@ -67,7 +67,7 @@ export function ProfileChecklist({
       label: ownsEstablishment ? "Company details" : "Business details",
       done: counts.companies > 0,
     },
-    { label: "Documents", done: counts.files > 0 },
+    { label: "Jobs", done: counts.jobs > 0 },
   ];
   const doneCount = items.filter((i) => i.done).length;
   const pct = Math.round((doneCount / items.length) * 100);

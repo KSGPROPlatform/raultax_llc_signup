@@ -21,9 +21,33 @@ function getKey(): Promise<Uint8Array> {
   return keyPromise;
 }
 
-export async function createUploadToken(oid: string): Promise<string> {
+// What a QR upload is for: a specific document slot (and job), so the phone page
+// uploads to exactly the right place.
+export type UploadTarget = {
+  docType?: string | null;
+  jobId?: number | null;
+  label?: string | null;
+};
+
+export type UploadTokenPayload = {
+  oid: string;
+  docType: string | null;
+  jobId: number | null;
+  label: string | null;
+};
+
+export async function createUploadToken(
+  oid: string,
+  target?: UploadTarget,
+): Promise<string> {
   const key = await getKey();
-  return new EncryptJWT({ oid, purpose: PURPOSE })
+  return new EncryptJWT({
+    oid,
+    purpose: PURPOSE,
+    docType: target?.docType ?? null,
+    jobId: target?.jobId ?? null,
+    label: target?.label ?? null,
+  })
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .setIssuedAt()
     .setExpirationTime(`${UPLOAD_TOKEN_MAX_AGE}s`)
@@ -32,13 +56,18 @@ export async function createUploadToken(oid: string): Promise<string> {
 
 export async function verifyUploadToken(
   token: string | undefined | null,
-): Promise<{ oid: string } | null> {
+): Promise<UploadTokenPayload | null> {
   if (!token) return null;
   try {
     const key = await getKey();
     const { payload } = await jwtDecrypt(token, key);
     if (payload.purpose !== PURPOSE || typeof payload.oid !== "string") return null;
-    return { oid: payload.oid };
+    return {
+      oid: payload.oid,
+      docType: typeof payload.docType === "string" ? payload.docType : null,
+      jobId: typeof payload.jobId === "number" ? payload.jobId : null,
+      label: typeof payload.label === "string" ? payload.label : null,
+    };
   } catch {
     // Expired, tampered, or signed with an old secret.
     return null;

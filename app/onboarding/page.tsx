@@ -11,7 +11,7 @@ import {
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
-import { DocumentVault } from "@/components/documents/DocumentVault";
+import { JobsSection } from "@/components/dashboard/JobsSection";
 import { postJson } from "@/lib/api";
 
 const STEPS = [
@@ -28,12 +28,12 @@ const STEPS = [
     subtitle: "Where your refund should be deposited.",
   },
   {
-    title: "Your business",
-    subtitle: "Tell us about any establishment you own.",
+    title: "Jobs",
+    subtitle: "Add each job and upload its W-2 and 1099.",
   },
   {
-    title: "Documents",
-    subtitle: "Upload your tax documents — or scan the QR to use your phone camera.",
+    title: "Your business",
+    subtitle: "Tell us about any establishment you own.",
   },
   {
     title: "You're all set",
@@ -63,23 +63,24 @@ export default function OnboardingPage() {
           .then((r) => (r.ok ? r.json() : {}))
           .catch(() => ({}));
       const len = (v: unknown) => (Array.isArray(v) ? v.length : 0);
-      const [pf, dep, bank, co, files] = await Promise.all([
+      const [pf, dep, bank, jobs, co] = await Promise.all([
         get("/api/profile/personal"),
         get("/api/dependents"),
         get("/api/bank-accounts"),
+        get("/api/jobs"),
         get("/api/companies"),
-        get("/api/files"),
       ]);
       if (!active) return;
       const profile = (pf.profile ?? {}) as Partial<PersonalInfoValues>;
       if (pf.profile) setPersonal(profile);
       // Which steps already have data: [Personal, Dependents, Bank, Business, Documents]
+      // [Personal, Dependents, Bank, Jobs, Business]
       const hasData = [
         Boolean((profile.date_of_birth ?? "").trim()),
         len(dep.rows) > 0,
         len(bank.rows) > 0,
+        len(jobs.rows) > 0,
         len(co.rows) > 0,
-        len(files.files) > 0,
       ];
       let furthest = -1;
       hasData.forEach((has, i) => {
@@ -190,8 +191,8 @@ export default function OnboardingPage() {
               ))}
             {step === 1 && <DependentsSection />}
             {step === 2 && <BankSection />}
-            {step === 3 && <CompaniesSection />}
-            {step === 4 && <DocumentVault />}
+            {step === 3 && <JobsSection />}
+            {step === 4 && <CompaniesSection />}
             {step === 5 && (
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
                 Everything is saved as you go. Click{" "}

@@ -143,6 +143,19 @@ export const saveCompany = (oid: string, c: CompanyInput) =>
 export const deleteCompany = (oid: string, id: number) =>
   deleteRow("companies", oid, id);
 
+// ---- Jobs (one user has many; W-2/1099 attach per job via file job_id) ----
+export type Job = {
+  id: number;
+  owner_oid: string;
+  job_name: string;
+  created_at: string;
+  updated_at: string;
+};
+export type JobInput = { id?: number; job_name: string };
+export const listJobs = (oid: string) => listRows<Job>("jobs", oid);
+export const saveJob = (oid: string, j: JobInput) => saveRow<Job>("jobs", oid, j);
+export const deleteJob = (oid: string, id: number) => deleteRow("jobs", oid, id);
+
 // ---- The signed-in user's own saved personal profile ----
 // Reads the user's raul_tax_users row via the manageUsers function (scoped to
 // the caller's oid by the /api/profile/personal route) so the onboarding

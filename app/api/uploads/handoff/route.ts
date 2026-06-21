@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import QRCode from "qrcode";
 import { getSession } from "@/lib/auth";
 import { createUploadToken, UPLOAD_TOKEN_MAX_AGE } from "@/lib/uploadToken";
+import { isKnownDocType } from "@/lib/docTypes";
 
 // GET /api/uploads/handoff — (authenticated) mints a short-lived upload-only
 // token and returns a QR code the user scans to continue uploading on their
@@ -10,7 +11,15 @@ export async function GET(request: Request) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const token = await createUploadToken(user.sub);
+  // Optional target slot so the phone uploads to exactly the right place
+  // (a specific document, optionally tied to a job).
+  const params = new URL(request.url).searchParams;
+  const docTypeRaw = params.get("docType");
+  const docType = docTypeRaw && isKnownDocType(docTypeRaw) ? docTypeRaw : null;
+  const jobIdRaw = params.get("jobId");
+  const jobId = jobIdRaw && /^\d+$/.test(jobIdRaw) ? Number(jobIdRaw) : null;
+  const label = (params.get("label") || "").slice(0, 80) || null;
+  const token = await createUploadToken(user.sub, { docType, jobId, label });
 
   // Prefer the origin the BROWSER is actually on (sent by the client) — it is
   // the authoritative public URL. Behind Azure Static Web Apps the server-side

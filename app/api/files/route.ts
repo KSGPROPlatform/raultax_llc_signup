@@ -37,11 +37,13 @@ export async function POST(request: Request) {
 
     const bytes = await file.arrayBuffer();
     const contentType = file.type || "application/octet-stream";
-    // Optional document category (Form 5). Single-file slots replace via saveDocument.
+    // Optional document category + per-job link. Single-file slots replace via saveDocument.
     const docTypeRaw = form.get("docType");
     const docType = typeof docTypeRaw === "string" && isKnownDocType(docTypeRaw) ? docTypeRaw : null;
+    const jobIdRaw = form.get("jobId");
+    const jobId = typeof jobIdRaw === "string" && /^\d+$/.test(jobIdRaw) ? Number(jobIdRaw) : null;
     const saved = docType
-      ? await saveDocument(user.sub, file.name, contentType, bytes, docType)
+      ? await saveDocument(user.sub, file.name, contentType, bytes, docType, jobId)
       : await uploadFile(user.sub, file.name, contentType, bytes);
     return NextResponse.json({ file: saved }, { status: 201 });
   } catch (err) {

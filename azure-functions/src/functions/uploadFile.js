@@ -30,7 +30,9 @@ app.http("uploadFile", {
       const filename = request.query.get("filename") || "file";
       const contentType =
         request.query.get("contentType") || "application/octet-stream";
-      const docType = request.query.get("docType") || null; // category (Form 5); null = uncategorised
+      const docType = request.query.get("docType") || null; // category; null = uncategorised
+      const jobIdRaw = request.query.get("jobId");
+      const jobId = jobIdRaw && /^\d+$/.test(jobIdRaw) ? Number(jobIdRaw) : null; // links W-2/1099 to a job
       if (!oid) return { status: 400, jsonBody: { error: "oid is required" } };
 
       const raw = Buffer.from(await request.arrayBuffer());
@@ -63,13 +65,14 @@ app.http("uploadFile", {
         .input("size", sql.BigInt, sizeBytes)
         .input("stored", sql.BigInt, storedBytes)
         .input("comp", sql.Bit, compress ? 1 : 0)
-        .input("docType", sql.NVarChar(64), docType).query(`
+        .input("docType", sql.NVarChar(64), docType)
+        .input("jobId", sql.Int, jobId).query(`
           INSERT INTO ${cfg.filesTable}
-            (owner_oid, blob_name, original_name, content_type, size_bytes, stored_bytes, is_compressed, doc_type)
+            (owner_oid, blob_name, original_name, content_type, size_bytes, stored_bytes, is_compressed, doc_type, job_id)
           OUTPUT inserted.id, inserted.owner_oid, inserted.blob_name,
                  inserted.original_name, inserted.content_type, inserted.size_bytes,
-                 inserted.stored_bytes, inserted.is_compressed, inserted.doc_type, inserted.uploaded_at
-          VALUES (@oid, @blob, @name, @ctype, @size, @stored, @comp, @docType);
+                 inserted.stored_bytes, inserted.is_compressed, inserted.doc_type, inserted.job_id, inserted.uploaded_at
+          VALUES (@oid, @blob, @name, @ctype, @size, @stored, @comp, @docType, @jobId);
         `);
 
       return { status: 200, jsonBody: result.recordset[0] };

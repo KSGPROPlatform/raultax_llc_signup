@@ -19,6 +19,7 @@ export type UserFile = {
   stored_bytes: number | null;
   is_compressed: boolean;
   doc_type: string | null;
+  job_id: number | null;
   uploaded_at: string;
 };
 
@@ -62,9 +63,16 @@ export async function uploadFile(
   contentType: string,
   bytes: ArrayBuffer,
   docType?: string | null,
+  jobId?: number | null,
 ): Promise<UserFile> {
   const res = await fetch(
-    fnUrl("uploadFile", { oid, filename, contentType, docType: docType ?? undefined }),
+    fnUrl("uploadFile", {
+      oid,
+      filename,
+      contentType,
+      docType: docType ?? undefined,
+      jobId: jobId ?? undefined,
+    }),
     {
       method: "POST",
       headers: { ...APP_HEADERS, "Content-Type": "application/octet-stream" },
@@ -89,11 +97,20 @@ export async function saveDocument(
   contentType: string,
   bytes: ArrayBuffer,
   docType: string,
+  jobId?: number | null,
 ): Promise<UserFile> {
-  const saved = await uploadFile(oid, filename, contentType, bytes, docType);
-  if (docType && !isMultiple(docType)) {
+  const saved = await uploadFile(oid, filename, contentType, bytes, docType, jobId);
+  // Single-file slots replace the previous file: per-job docs (W-2/1099) are one
+  // per job; non-job docs replace when the catalog marks them single (e.g. SSN).
+  const single = jobId != null || (docType && !isMultiple(docType));
+  if (single) {
     const all = await listFiles(oid);
-    const stale = all.filter((f) => f.doc_type === docType && f.id !== saved.id);
+    const stale = all.filter(
+      (f) =>
+        f.doc_type === docType &&
+        (f.job_id ?? null) === (jobId ?? null) &&
+        f.id !== saved.id,
+    );
     await Promise.all(stale.map((f) => deleteFile(oid, f.id).catch(() => {})));
   }
   return saved;
