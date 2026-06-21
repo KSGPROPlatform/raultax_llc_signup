@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Field, SelectField, FormButtons } from "@/components/forms/Field";
-import { StateSelect } from "@/components/forms/StateSelect";
+import { Field, FormButtons } from "@/components/forms/Field";
+import { ComboField } from "@/components/forms/ComboField";
 import { CityField } from "@/components/forms/CityField";
+import { US_STATES } from "@/lib/usStates";
 import { PhoneField } from "@/components/forms/PhoneField";
 import { SsnField } from "@/components/forms/SsnField";
 import { DateOfBirthPicker } from "@/components/forms/DateOfBirthPicker";
@@ -16,6 +17,7 @@ const FILING_STATUS = [
   "Head of household",
   "Qualifying surviving spouse",
 ];
+const STATE_NAMES = US_STATES.map((s) => s.name);
 
 export type PersonalInfoValues = {
   first_name: string;
@@ -70,10 +72,6 @@ export function PersonalInfoForm({
     (k: keyof PersonalInfoValues) =>
     (e: React.ChangeEvent<HTMLInputElement>) =>
       setV((p) => ({ ...p, [k]: e.target.value }));
-  const setSelect =
-    (k: keyof PersonalInfoValues) =>
-    (e: React.ChangeEvent<HTMLSelectElement>) =>
-      setV((p) => ({ ...p, [k]: e.target.value }));
   const setValue = (k: keyof PersonalInfoValues) => (value: string) =>
     setV((p) => ({ ...p, [k]: value }));
 
@@ -118,20 +116,20 @@ export function PersonalInfoForm({
         value={v.date_of_birth}
         onChange={setValue("date_of_birth")}
       />
-      <SelectField
+      <ComboField
         id="pi_marital_status"
         label="Marital status"
         required
         value={v.marital_status}
-        onChange={setSelect("marital_status")}
+        onChange={setValue("marital_status")}
         options={MARITAL_STATUS}
       />
-      <SelectField
+      <ComboField
         id="pi_filing_status"
         label="Filing status"
         required
         value={v.filing_status}
-        onChange={setSelect("filing_status")}
+        onChange={setValue("filing_status")}
         options={FILING_STATUS}
       />
       <Field
@@ -167,12 +165,13 @@ export function PersonalInfoForm({
         onChange={setText("street_address")}
         autoComplete="street-address"
       />
-      <StateSelect
+      <ComboField
         id="pi_state_province"
         label="State"
         required
         value={v.state_province}
         onChange={setValue("state_province")}
+        options={STATE_NAMES}
       />
       <CityField
         id="pi_city"
