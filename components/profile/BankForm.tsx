@@ -79,9 +79,9 @@ export function BankForm({
       }}
       className="space-y-4"
     >
+      <MaskedField id="bank_routing" label="Routing number" required maxLength={32} inputMode="numeric" value={v.routing_number} onChange={onRouting} hint={bankHint ?? undefined} />
       <Field id="bank_name" label="Bank name" required maxLength={128} value={v.bank_name} onChange={set("bank_name")} autoComplete="off" />
       <MaskedField id="bank_account" label="Account number" required maxLength={64} inputMode="numeric" value={v.account_number} onChange={setVal("account_number")} hint="Stored securely on your account." />
-      <MaskedField id="bank_routing" label="Routing number" required maxLength={32} inputMode="numeric" value={v.routing_number} onChange={onRouting} hint={bankHint ?? undefined} />
       <FormButtons busy={busy} submitLabel={submitLabel} onCancel={onCancel} />
     </form>
   );
