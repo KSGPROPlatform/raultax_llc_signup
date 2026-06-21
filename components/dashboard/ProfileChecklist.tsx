@@ -60,6 +60,7 @@ export function ProfileChecklist({
 
   const items = [
     { label: "Personal information", done: counts.personalDone },
+    { label: "Jobs", done: counts.jobs > 0 },
     { label: "Bank information", done: counts.bank > 0 },
     {
       // "Done" only once a company is actually added; a no-business user reaches
@@ -67,7 +68,6 @@ export function ProfileChecklist({
       label: ownsEstablishment ? "Company details" : "Business details",
       done: counts.companies > 0,
     },
-    { label: "Jobs", done: counts.jobs > 0 },
   ];
   const doneCount = items.filter((i) => i.done).length;
   const pct = Math.round((doneCount / items.length) * 100);
