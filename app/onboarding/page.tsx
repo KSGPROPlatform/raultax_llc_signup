@@ -51,22 +51,42 @@ export default function OnboardingPage() {
   const [error, setError] = useState<string | null>(null);
   const last = STEPS.length - 1;
 
-  // Pre-fill the Personal-info step with what's already saved (first/last from
-  // sign-up, plus anything entered on a previous visit).
+  // On load: pre-fill Personal info AND resume at the next unfinished step, so
+  // re-entering onboarding doesn't restart at Form 1. Resume = the step after the
+  // furthest one that already has saved data; it reads the DB, so it also works
+  // across devices/browsers.
   useEffect(() => {
     let active = true;
     (async () => {
-      try {
-        const res = await fetch("/api/profile/personal");
-        if (res.ok && active) {
-          const data = await res.json();
-          if (data.profile) setPersonal(data.profile);
-        }
-      } catch {
-        /* fall back to empty fields */
-      } finally {
-        if (active) setLoadedPersonal(true);
-      }
+      const get = (url: string): Promise<Record<string, unknown>> =>
+        fetch(url)
+          .then((r) => (r.ok ? r.json() : {}))
+          .catch(() => ({}));
+      const len = (v: unknown) => (Array.isArray(v) ? v.length : 0);
+      const [pf, dep, bank, co, files] = await Promise.all([
+        get("/api/profile/personal"),
+        get("/api/dependents"),
+        get("/api/bank-accounts"),
+        get("/api/companies"),
+        get("/api/files"),
+      ]);
+      if (!active) return;
+      const profile = (pf.profile ?? {}) as Partial<PersonalInfoValues>;
+      if (pf.profile) setPersonal(profile);
+      // Which steps already have data: [Personal, Dependents, Bank, Business, Documents]
+      const hasData = [
+        Boolean((profile.date_of_birth ?? "").trim()),
+        len(dep.rows) > 0,
+        len(bank.rows) > 0,
+        len(co.rows) > 0,
+        len(files.files) > 0,
+      ];
+      let furthest = -1;
+      hasData.forEach((has, i) => {
+        if (has) furthest = i;
+      });
+      if (furthest >= 0) setStep(Math.min(furthest + 1, STEPS.length - 1));
+      setLoadedPersonal(true);
     })();
     return () => {
       active = false;

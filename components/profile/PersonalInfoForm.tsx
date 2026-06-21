@@ -7,7 +7,7 @@ import { CityField } from "@/components/forms/CityField";
 import { US_STATES } from "@/lib/usStates";
 import { PhoneField } from "@/components/forms/PhoneField";
 import { SsnField } from "@/components/forms/SsnField";
-import { DateOfBirthPicker } from "@/components/forms/DateOfBirthPicker";
+import { DateField } from "@/components/forms/DateField";
 
 const MARITAL_STATUS = ["Single", "Married", "Divorced", "Widowed", "Separated"];
 const FILING_STATUS = [
@@ -109,7 +109,7 @@ export function PersonalInfoForm({
         onChange={setText("last_name")}
         autoComplete="family-name"
       />
-      <DateOfBirthPicker
+      <DateField
         id="pi_dob"
         label="Date of birth"
         required

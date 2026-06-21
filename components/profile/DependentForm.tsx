@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Field, FormButtons } from "@/components/forms/Field";
 import { ComboField } from "@/components/forms/ComboField";
 import { SsnField } from "@/components/forms/SsnField";
+import { DateField } from "@/components/forms/DateField";
 
 const RELATIONSHIPS = ["Spouse", "Child", "Parent", "Sibling", "Other dependent"];
 
@@ -54,7 +55,7 @@ export function DependentForm({
     >
       <Field id="dep_full_name" label="Full name" required maxLength={256} value={v.full_name} onChange={set("full_name")} autoComplete="off" />
       <SsnField id="dep_ssn" label="Social Security number" required value={v.ssn} onChange={setVal("ssn")} hint="Stored securely on your account." />
-      <Field id="dep_dob" label="Date of birth" placeholder="DD/MM/YY" required maxLength={32} value={v.date_of_birth} onChange={set("date_of_birth")} autoComplete="off" />
+      <DateField id="dep_dob" label="Date of birth" required value={v.date_of_birth} onChange={setVal("date_of_birth")} />
       <ComboField id="dep_rel" label="Relationship" required value={v.relationship} onChange={setVal("relationship")} options={RELATIONSHIPS} />
       <FormButtons busy={busy} submitLabel={submitLabel} onCancel={onCancel} />
     </form>
