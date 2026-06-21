@@ -198,6 +198,56 @@ export const listJobs = (oid: string) => listRows<Job>("jobs", oid);
 export const saveJob = (oid: string, j: JobInput) => saveRow<Job>("jobs", oid, j);
 export const deleteJob = (oid: string, id: number) => deleteRow("jobs", oid, id);
 
+// ---- Spouse (filing-status driven; one per user) ----
+export type Spouse = {
+  id: number;
+  owner_oid: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  ssn: string;
+  street_address: string;
+  city: string;
+  state_province: string;
+  postal_code: string;
+  created_at: string;
+  updated_at: string;
+};
+// Partial: "Married filing separately" saves only the SSN; "Married filing
+// jointly" saves the full record. Absent fields are kept by the function.
+export type SpouseInput = Partial<
+  Pick<
+    Spouse,
+    | "first_name"
+    | "last_name"
+    | "date_of_birth"
+    | "ssn"
+    | "street_address"
+    | "city"
+    | "state_province"
+    | "postal_code"
+  >
+>;
+
+export async function getSpouse(oid: string): Promise<Spouse | null> {
+  if (!base) return null;
+  try {
+    const res = await fetch(fnUrl("spouse", { oid }), {
+      headers: APP_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Spouse | null;
+    return data && data.id ? data : null;
+  } catch (err) {
+    console.error("spouse get failed:", err);
+    return null;
+  }
+}
+export const saveSpouse = (oid: string, s: SpouseInput) =>
+  saveRow<Spouse>("spouse", oid, s);
+
 // ---- The signed-in user's own saved personal profile ----
 // Reads the user's raul_tax_users row via the manageUsers function (scoped to
 // the caller's oid by the /api/profile/personal route) so the onboarding

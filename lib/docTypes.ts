@@ -12,6 +12,7 @@ export type DocType = {
 
 export const DOC_TYPES: DocType[] = [
   { key: "ssn_copy", label: "Copy of SSN", multiple: false, hint: "Social Security card" },
+  { key: "spouse_ssn_copy", label: "Spouse SSN document", multiple: false, hint: "Spouse's Social Security card" },
   { key: "id_front", label: "ID — Front", multiple: false, hint: "Driver's licence / passport" },
   { key: "id_back", label: "ID — Back", multiple: false },
   { key: "w2", label: "W-2", multiple: true },

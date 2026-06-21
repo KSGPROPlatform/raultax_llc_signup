@@ -16,7 +16,6 @@ const FILING_STATUS = [
   "Married filing jointly",
   "Married filing separately",
   "Head of household",
-  "Qualifying surviving spouse",
 ];
 const STATE_NAMES = US_STATES.map((s) => s.name);
 

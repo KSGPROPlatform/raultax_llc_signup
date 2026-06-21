@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { buttonClass, FormError } from "@/components/auth/AuthShell";
@@ -8,38 +8,72 @@ import {
   PersonalInfoForm,
   type PersonalInfoValues,
 } from "@/components/profile/PersonalInfoForm";
+import { SpouseSection } from "@/components/dashboard/SpouseSection";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
 import { JobsSection } from "@/components/dashboard/JobsSection";
 import { postJson } from "@/lib/api";
 
-const STEPS = [
-  {
+type StepKey =
+  | "personal"
+  | "spouse"
+  | "dependents"
+  | "bank"
+  | "jobs"
+  | "business"
+  | "finish";
+
+const META: Record<StepKey, { title: string; subtitle: string }> = {
+  personal: {
     title: "Personal info",
     subtitle: "Tell us about yourself so we can prepare your return.",
   },
-  {
+  spouse: {
+    title: "Spouse information",
+    subtitle: "Details for the person you file with.",
+  },
+  dependents: {
     title: "Your dependents",
     subtitle: "Add anyone you support. Skip if you have none.",
   },
-  {
+  bank: {
     title: "Bank information",
     subtitle: "Where your refund should be deposited.",
   },
-  {
-    title: "Jobs",
-    subtitle: "Add each job and upload its W-2 and 1099.",
-  },
-  {
+  jobs: { title: "Jobs", subtitle: "Add each job and upload its W-2 and 1099." },
+  business: {
     title: "Your business",
     subtitle: "Tell us about any establishment you own.",
   },
-  {
+  finish: {
     title: "You're all set",
     subtitle: "Finish to reach your dashboard — you can edit anything later.",
   },
-];
+};
+
+// The journey branches on the Form-1 filing status:
+//   Single                    -> no spouse, no dependents
+//   Married filing jointly    -> full spouse step + dependents
+//   Married filing separately -> spouse SSN-only step + dependents
+//   Head of household         -> dependents (no spouse)
+function buildSteps(filingStatus: string): StepKey[] {
+  const needsSpouse =
+    filingStatus === "Married filing jointly" ||
+    filingStatus === "Married filing separately";
+  const needsDependents = filingStatus !== "Single";
+  return [
+    "personal",
+    ...(needsSpouse ? (["spouse"] as StepKey[]) : []),
+    ...(needsDependents ? (["dependents"] as StepKey[]) : []),
+    "bank",
+    "jobs",
+    "business",
+    "finish",
+  ];
+}
+const spouseModeFor = (fs: string): "full" | "ssn" =>
+  fs === "Married filing jointly" ? "full" : "ssn";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -49,12 +83,22 @@ export default function OnboardingPage() {
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [loadedPersonal, setLoadedPersonal] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const last = STEPS.length - 1;
 
-  // On load: pre-fill Personal info AND resume at the next unfinished step, so
-  // re-entering onboarding doesn't restart at Form 1. Resume = the step after the
-  // furthest one that already has saved data; it reads the DB, so it also works
-  // across devices/browsers.
+  const fs = personal.filing_status ?? "";
+  const steps = useMemo(() => buildSteps(fs), [fs]);
+  const spouseMode = spouseModeFor(fs);
+  const last = steps.length - 1;
+  const safeStep = Math.min(step, last);
+  const currentKey = steps[safeStep];
+
+  // Keep the index valid if the active steps shrink (e.g. switching to Single
+  // drops the dependents step).
+  useEffect(() => {
+    if (step > last) setStep(last);
+  }, [step, last]);
+
+  // On load: pre-fill Personal info AND resume at the next unfinished step (per
+  // the filing-status-aware step list), reading the DB so it works across devices.
   useEffect(() => {
     let active = true;
     (async () => {
@@ -63,8 +107,9 @@ export default function OnboardingPage() {
           .then((r) => (r.ok ? r.json() : {}))
           .catch(() => ({}));
       const len = (v: unknown) => (Array.isArray(v) ? v.length : 0);
-      const [pf, dep, bank, jobs, co] = await Promise.all([
+      const [pf, sp, dep, bank, jobs, co] = await Promise.all([
         get("/api/profile/personal"),
+        get("/api/spouse"),
         get("/api/dependents"),
         get("/api/bank-accounts"),
         get("/api/jobs"),
@@ -73,20 +118,25 @@ export default function OnboardingPage() {
       if (!active) return;
       const profile = (pf.profile ?? {}) as Partial<PersonalInfoValues>;
       if (pf.profile) setPersonal(profile);
-      // Which steps already have data: [Personal, Dependents, Bank, Business, Documents]
-      // [Personal, Dependents, Bank, Jobs, Business]
-      const hasData = [
-        Boolean((profile.date_of_birth ?? "").trim()),
-        len(dep.rows) > 0,
-        len(bank.rows) > 0,
-        len(jobs.rows) > 0,
-        len(co.rows) > 0,
-      ];
+      const localSteps = buildSteps(profile.filing_status ?? "");
+      const spouse = (sp.spouse ?? null) as Record<string, string> | null;
+      const has: Record<StepKey, boolean> = {
+        personal: Boolean((profile.date_of_birth ?? "").trim()),
+        spouse: Boolean(
+          spouse &&
+            ((spouse.ssn ?? "").trim() || (spouse.first_name ?? "").trim()),
+        ),
+        dependents: len(dep.rows) > 0,
+        bank: len(bank.rows) > 0,
+        jobs: len(jobs.rows) > 0,
+        business: len(co.rows) > 0,
+        finish: false,
+      };
       let furthest = -1;
-      hasData.forEach((has, i) => {
-        if (has) furthest = i;
+      localSteps.forEach((k, i) => {
+        if (has[k]) furthest = i;
       });
-      if (furthest >= 0) setStep(Math.min(furthest + 1, STEPS.length - 1));
+      if (furthest >= 0) setStep(Math.min(furthest + 1, localSteps.length - 1));
       setLoadedPersonal(true);
     })();
     return () => {
@@ -94,8 +144,8 @@ export default function OnboardingPage() {
     };
   }, []);
 
-  // Step 0 "Continue" is the PersonalInfoForm's own submit button. Save to the
-  // DB, remember the values (so re-visiting shows them), then advance.
+  // Step "personal" Continue is the PersonalInfoForm's own submit. Save, remember
+  // the values (which re-derives the step list from the new filing status), advance.
   async function savePersonal(values: PersonalInfoValues) {
     setError(null);
     setSavingPersonal(true);
@@ -103,7 +153,8 @@ export default function OnboardingPage() {
     setSavingPersonal(false);
     if (!ok) return setError(error);
     setPersonal(values);
-    setStep((s) => Math.min(last, s + 1));
+    const newLast = buildSteps(values.filing_status ?? "").length - 1;
+    setStep((s) => Math.min(newLast, s + 1));
   }
 
   async function finish() {
@@ -133,13 +184,13 @@ export default function OnboardingPage() {
         {/* Progress */}
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            Step {step + 1} of {STEPS.length}
+            Step {safeStep + 1} of {steps.length}
           </p>
-          {step < last && (
+          {safeStep < last && (
             <button
               type="button"
               onClick={() => {
-                // Optional flow: just return to the dashboard WITHOUT marking
+                // Optional flow: return to the dashboard WITHOUT marking
                 // onboarding complete, so the "complete your profile" nudge stays.
                 router.push("/dashboard");
                 router.refresh();
@@ -151,11 +202,11 @@ export default function OnboardingPage() {
           )}
         </div>
         <div className="mb-6 flex gap-1.5">
-          {STEPS.map((s, i) => (
+          {steps.map((k, i) => (
             <span
-              key={s.title}
+              key={k}
               className={`h-1 flex-1 rounded-full ${
-                i <= step ? "bg-amber-500" : "bg-zinc-200 dark:bg-zinc-800"
+                i <= safeStep ? "bg-amber-500" : "bg-zinc-200 dark:bg-zinc-800"
               }`}
             />
           ))}
@@ -164,14 +215,14 @@ export default function OnboardingPage() {
         {/* Card */}
         <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 sm:p-8">
           <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {STEPS[step].title}
+            {META[currentKey].title}
           </h1>
           <p className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
-            {STEPS[step].subtitle}
+            {META[currentKey].subtitle}
           </p>
 
           <div className="mt-6">
-            {step === 0 &&
+            {currentKey === "personal" &&
               (loadedPersonal ? (
                 <>
                   <div className="mb-4">
@@ -189,24 +240,26 @@ export default function OnboardingPage() {
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               ))}
-            {step === 1 && <DependentsSection />}
-            {step === 2 && <BankSection />}
-            {step === 3 && <JobsSection />}
-            {step === 4 && <CompaniesSection />}
-            {step === 5 && (
+            {currentKey === "spouse" && <SpouseSection mode={spouseMode} />}
+            {currentKey === "dependents" && <DependentsSection />}
+            {currentKey === "bank" && <BankSection />}
+            {currentKey === "jobs" && <JobsSection />}
+            {currentKey === "business" && <CompaniesSection />}
+            {currentKey === "finish" && (
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
                 Everything is saved as you go. Click{" "}
-                <span className="font-medium text-zinc-900 dark:text-zinc-50">Finish</span>{" "}
+                <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                  Finish
+                </span>{" "}
                 to head to your dashboard, where you can review or update these
                 details anytime.
               </div>
             )}
           </div>
 
-          {/* Nav — the Personal info step (0) uses the form's own submit for
-              "Continue", so we only render the generic footer there if a Back
-              button is needed (it isn't on the first step). */}
-          {step > 0 && (
+          {/* Nav — the Personal info step uses the form's own submit for
+              "Continue", so the generic footer renders for every other step. */}
+          {currentKey !== "personal" && (
             <div className="mt-8 flex gap-2">
               <button
                 type="button"
@@ -215,7 +268,7 @@ export default function OnboardingPage() {
               >
                 <ArrowLeft className="h-4 w-4" /> Back
               </button>
-              {step < last ? (
+              {safeStep < last ? (
                 <button
                   type="button"
                   onClick={() => setStep((s) => Math.min(last, s + 1))}

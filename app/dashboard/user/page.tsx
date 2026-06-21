@@ -12,9 +12,11 @@ import { RoleBadge } from "@/components/dashboard/RoleBadge";
 import { JobsSection } from "@/components/dashboard/JobsSection";
 import { DocUpload } from "@/components/documents/DocUpload";
 import { ProfileChecklist } from "@/components/dashboard/ProfileChecklist";
+import { SpouseSection } from "@/components/dashboard/SpouseSection";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
+import { getUserProfile } from "@/lib/profileData";
 
 const QUICK_ACTIONS = [
   { label: "Start a new filing", desc: "Form a new LLC", icon: Plus },
@@ -31,6 +33,20 @@ export default async function UserDashboardPage() {
 
   const name = user.name || user.email || "there";
   const first = name.split(" ")[0];
+
+  // Filing status drives which sections appear (mirrors the onboarding journey):
+  //  Single                    -> no spouse, no dependents
+  //  Married filing jointly    -> full spouse + dependents
+  //  Married filing separately -> spouse SSN only + dependents
+  //  Head of household         -> dependents (no spouse)
+  const profile = await getUserProfile(user.sub);
+  const filingStatus = profile?.filing_status ?? "";
+  const showSpouse =
+    filingStatus === "Married filing jointly" ||
+    filingStatus === "Married filing separately";
+  const spouseMode: "full" | "ssn" =
+    filingStatus === "Married filing jointly" ? "full" : "ssn";
+  const showDependents = filingStatus !== "Single";
 
   return (
     <div className="space-y-8">
@@ -93,13 +109,25 @@ export default async function UserDashboardPage() {
         ))}
       </section>
 
-      {/* Dependents */}
-      <section id="dependents" className="scroll-mt-6 space-y-4">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Dependents
-        </h2>
-        <DependentsSection />
-      </section>
+      {/* Spouse — only for Married filing jointly / separately */}
+      {showSpouse && (
+        <section id="spouse" className="scroll-mt-6 space-y-4">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Spouse information
+          </h2>
+          <SpouseSection mode={spouseMode} />
+        </section>
+      )}
+
+      {/* Dependents — hidden for Single filers */}
+      {showDependents && (
+        <section id="dependents" className="scroll-mt-6 space-y-4">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            Dependents
+          </h2>
+          <DependentsSection />
+        </section>
+      )}
 
       {/* Bank information */}
       <section id="bank" className="scroll-mt-6 space-y-4">
