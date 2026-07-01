@@ -40,7 +40,7 @@ async function upsertExtraction(pool, e) {
 }
 
 app.http("analyzeDocument", {
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "DELETE"],
   authLevel: "function",
   route: "analyzeDocument",
   handler: async (request, context) => {
@@ -56,6 +56,17 @@ app.http("analyzeDocument", {
     } catch (err) {
       context.error("analyzeDocument pool failed", err);
       return { status: 500, jsonBody: { error: "Internal error" } };
+    }
+
+    // Remove the stored extraction (called when the underlying file is deleted so
+    // extracted sensitive data doesn't outlive the document).
+    if (request.method === "DELETE") {
+      await pool
+        .request()
+        .input("oid", sql.NVarChar(64), oid)
+        .input("fid", sql.Int, fileId)
+        .query(`DELETE FROM raul_tax_file_extractions WHERE file_id = @fid AND owner_oid = @oid;`);
+      return { status: 200, jsonBody: { ok: true } };
     }
 
     if (request.method === "GET") {

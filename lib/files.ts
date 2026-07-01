@@ -177,6 +177,17 @@ export async function deleteFile(oid: string, id: number): Promise<void> {
     signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error("Delete failed");
+  // Best-effort: drop the stored extraction so extracted sensitive data (SSN,
+  // wages, …) doesn't outlive the deleted/replaced document.
+  try {
+    await fetch(fnUrl("analyzeDocument", { oid, fileId: id }), {
+      method: "DELETE",
+      headers: APP_HEADERS,
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    /* ignore — the file itself is already gone */
+  }
 }
 
 // Returns the decompressed file bytes + original content type, for the app to
