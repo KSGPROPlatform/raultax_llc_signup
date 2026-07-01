@@ -10,17 +10,43 @@ import {
   Smartphone,
   Loader2,
   CheckCircle2,
+  Sparkles,
+  ChevronDown,
   X,
 } from "lucide-react";
-import type { UserFile } from "@/lib/files";
-import { DOC_ACCEPT } from "@/lib/docTypes";
+import type { UserFile, Extraction } from "@/lib/files";
+import { DOC_ACCEPT, isExtractable } from "@/lib/docTypes";
+import { maskTail } from "@/components/profile/mask";
 
 type Qr = { url: string; qrDataUrl: string; expiresInSec: number };
+type AnalyzeState = "idle" | "reading" | "done" | "unsupported" | "error";
+
+// Fields we never render in the clear even in the little preview.
+const SENSITIVE = /ssn|tin|account|routing/i;
+
+function parseFields(ex: Extraction | null): Record<string, unknown> | null {
+  if (!ex) return null;
+  if (ex.fields) return ex.fields;
+  if (ex.fields_json) {
+    try {
+      return JSON.parse(ex.fields_json);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function renderVal(v: unknown): string {
+  if (v == null || v === "") return "—";
+  if (typeof v === "object") return JSON.stringify(v).slice(0, 80);
+  return String(v);
+}
 
 // One inline document slot: shows the current file (view/download/remove) or an
 // uploader, plus a "Use phone" button that shows a QR so the exact document can
-// be captured on a phone (the slot live-updates when the phone uploads). Used
-// for the SSN doc (Form 1) and each job's W-2 / 1099.
+// be captured on a phone. After a file lands, high-value docs (W-2, 1099, ID,
+// SSN) are read by Azure Document Intelligence and the fields are saved.
 export function DocUpload({
   docType,
   jobId,
@@ -38,9 +64,13 @@ export function DocUpload({
   const [error, setError] = useState<string | null>(null);
   const [qr, setQr] = useState<Qr | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
+  const [analyze, setAnalyze] = useState<AnalyzeState>("idle");
+  const [fields, setFields] = useState<Record<string, unknown> | null>(null);
+  const [showFields, setShowFields] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const extractable = isExtractable(docType);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<UserFile | null> => {
     try {
       const res = await fetch("/api/files");
       if (res.ok) {
@@ -51,10 +81,12 @@ export function DocUpload({
             (f) => f.doc_type === docType && (f.job_id ?? null) === (jobId ?? null),
           ) ?? null;
         setFile(match);
+        return match;
       }
     } catch {
       /* keep current */
     }
+    return null;
   }, [docType, jobId]);
 
   useEffect(() => {
@@ -71,6 +103,54 @@ export function DocUpload({
     return () => clearInterval(id);
   }, [qr, refresh]);
 
+  const runAnalyze = useCallback(async (fileId: number) => {
+    setAnalyze("reading");
+    try {
+      const res = await fetch(`/api/files/${fileId}/analyze`, { method: "POST" });
+      const d = await res.json().catch(() => ({}));
+      const ex = d.extraction as Extraction | null;
+      if (res.ok && ex) {
+        setAnalyze(ex.status === "done" ? "done" : ex.status === "unsupported" ? "unsupported" : "error");
+        setFields(parseFields(ex));
+      } else {
+        setAnalyze("error");
+      }
+    } catch {
+      setAnalyze("error");
+    }
+  }, []);
+
+  // When a file lands (upload, replace, or phone upload) show the stored
+  // extraction if any, otherwise kick one off. Keyed on the file id so it runs
+  // exactly once per file and never loops on an error.
+  useEffect(() => {
+    if (!file || !extractable) {
+      setAnalyze(file ? "unsupported" : "idle");
+      return;
+    }
+    let active = true;
+    (async () => {
+      try {
+        const g = await fetch(`/api/files/${file.id}/analyze`);
+        const d = g.ok ? await g.json() : {};
+        const ex = (d.extraction ?? null) as Extraction | null;
+        if (!active) return;
+        if (ex && ex.status && ex.status !== "pending") {
+          setAnalyze(ex.status === "done" ? "done" : ex.status === "unsupported" ? "unsupported" : "error");
+          setFields(parseFields(ex));
+          return;
+        }
+        await runAnalyze(file.id);
+      } catch {
+        if (active) setAnalyze("error");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file?.id, extractable, runAnalyze]);
+
   async function upload(list: FileList | null) {
     if (!list || !list.length) return;
     setBusy(true);
@@ -85,6 +165,8 @@ export function DocUpload({
         const d = await res.json().catch(() => ({}));
         setError(d.error || "Upload failed.");
       } else {
+        setFields(null);
+        setShowFields(false);
         await refresh();
       }
     } catch {
@@ -97,8 +179,11 @@ export function DocUpload({
   async function remove() {
     if (!file || !confirm(`Remove ${label}?`)) return;
     const res = await fetch(`/api/files/${file.id}`, { method: "DELETE" });
-    if (res.ok) setFile(null);
-    else setError("Could not remove the file.");
+    if (res.ok) {
+      setFile(null);
+      setFields(null);
+      setAnalyze("idle");
+    } else setError("Could not remove the file.");
   }
 
   async function openPhone() {
@@ -116,6 +201,12 @@ export function DocUpload({
       setQrLoading(false);
     }
   }
+
+  const previewEntries = fields
+    ? Object.entries(fields).filter(
+        ([k, v]) => !k.startsWith("__") && k !== "text" && v != null && v !== "",
+      )
+    : [];
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-950">
@@ -151,6 +242,44 @@ export function DocUpload({
       </div>
 
       {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+
+      {/* Document Intelligence status (only for the extractable, uploaded docs) */}
+      {file && extractable && analyze === "reading" && (
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Reading your document…
+        </p>
+      )}
+      {file && analyze === "error" && (
+        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+          We couldn&apos;t read this document automatically — it&apos;s still saved.
+        </p>
+      )}
+      {file && analyze === "done" && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setShowFields((s) => !s)}
+            className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Details captured
+            {previewEntries.length > 0 && (
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showFields ? "rotate-180" : ""}`} />
+            )}
+          </button>
+          {showFields && previewEntries.length > 0 && (
+            <dl className="mt-2 grid gap-1 rounded-md bg-zinc-50 p-2 text-xs dark:bg-zinc-900/50">
+              {previewEntries.slice(0, 12).map(([k, v]) => (
+                <div key={k} className="flex gap-2">
+                  <dt className="shrink-0 text-zinc-500 dark:text-zinc-400">{k}</dt>
+                  <dd className="min-w-0 flex-1 truncate text-right font-medium text-zinc-800 dark:text-zinc-200">
+                    {SENSITIVE.test(k) ? maskTail(String(v)) : renderVal(v)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      )}
 
       <input
         ref={inputRef}

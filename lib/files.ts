@@ -116,6 +116,56 @@ export async function saveDocument(
   return saved;
 }
 
+// ---- Document Intelligence extraction (one per file) ----
+export type Extraction = {
+  file_id: number;
+  doc_type: string | null;
+  model: string | null;
+  status: string; // pending | done | unsupported | error
+  fields?: Record<string, unknown> | null; // from POST
+  fields_json?: string | null; // from GET (stored)
+  error?: string | null;
+};
+
+// Trigger extraction (blocks until the DI call completes — a few seconds).
+export async function analyzeDocument(
+  oid: string,
+  fileId: number,
+): Promise<Extraction | null> {
+  if (!base) return null;
+  try {
+    const res = await fetch(fnUrl("analyzeDocument", { oid, fileId }), {
+      method: "POST",
+      headers: APP_HEADERS,
+      signal: AbortSignal.timeout(90000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as Extraction;
+  } catch (err) {
+    console.error("analyzeDocument failed:", err);
+    return null;
+  }
+}
+
+// Read the stored extraction (for showing status / prior results).
+export async function getExtraction(
+  oid: string,
+  fileId: number,
+): Promise<Extraction | null> {
+  if (!base) return null;
+  try {
+    const res = await fetch(fnUrl("analyzeDocument", { oid, fileId }), {
+      headers: APP_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as Extraction | null;
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteFile(oid: string, id: number): Promise<void> {
   const res = await fetch(fnUrl("deleteFile", { oid, id }), {
     method: "DELETE",

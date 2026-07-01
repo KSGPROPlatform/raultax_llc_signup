@@ -44,3 +44,18 @@ export function docTypeLabel(key: string | null): string {
 
 // What the file inputs accept (images for phone photos + PDFs).
 export const DOC_ACCEPT = "image/*,application/pdf";
+
+// Doc types we run Azure Document Intelligence over on upload (v1 high-value set).
+// Keep in sync with MODEL_FOR in azure-functions/src/docintel.js.
+const EXTRACTABLE = new Set([
+  "w2",
+  "form_1099",
+  "id_front",
+  "id_back",
+  "ssn_copy",
+  "spouse_ssn_copy",
+]);
+
+export function isExtractable(key: string | null | undefined): boolean {
+  return key ? EXTRACTABLE.has(key) : false;
+}
