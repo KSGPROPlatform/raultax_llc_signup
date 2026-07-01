@@ -67,6 +67,7 @@ export function DocUpload({
   const [analyze, setAnalyze] = useState<AnalyzeState>("idle");
   const [fields, setFields] = useState<Record<string, unknown> | null>(null);
   const [showFields, setShowFields] = useState(false);
+  const [warning, setWarning] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const extractable = isExtractable(docType);
 
@@ -103,22 +104,33 @@ export function DocUpload({
     return () => clearInterval(id);
   }, [qr, refresh]);
 
-  const runAnalyze = useCallback(async (fileId: number) => {
-    setAnalyze("reading");
-    try {
-      const res = await fetch(`/api/files/${fileId}/analyze`, { method: "POST" });
-      const d = await res.json().catch(() => ({}));
-      const ex = d.extraction as Extraction | null;
-      if (res.ok && ex) {
-        setAnalyze(ex.status === "done" ? "done" : ex.status === "unsupported" ? "unsupported" : "error");
-        setFields(parseFields(ex));
-      } else {
+  const runAnalyze = useCallback(
+    async (fileId: number) => {
+      setAnalyze("reading");
+      try {
+        const res = await fetch(`/api/files/${fileId}/analyze`, { method: "POST" });
+        const d = await res.json().catch(() => ({}));
+        const ex = d.extraction as (Extraction & { deleted?: boolean }) | null;
+        if (res.ok && ex) {
+          if (ex.status === "mismatch") {
+            // The wrong document was rejected & deleted server-side.
+            setWarning(`This doesn't look like ${label}. Please upload the correct document.`);
+            setFile(null);
+            setFields(null);
+            setAnalyze("idle");
+            return;
+          }
+          setAnalyze(ex.status === "done" ? "done" : ex.status === "unsupported" ? "unsupported" : "error");
+          setFields(parseFields(ex));
+        } else {
+          setAnalyze("error");
+        }
+      } catch {
         setAnalyze("error");
       }
-    } catch {
-      setAnalyze("error");
-    }
-  }, []);
+    },
+    [label],
+  );
 
   // When a file lands (upload, replace, or phone upload) show the stored
   // extraction if any, otherwise kick one off. Keyed on the file id so it runs
@@ -155,6 +167,7 @@ export function DocUpload({
     if (!list || !list.length) return;
     setBusy(true);
     setError(null);
+    setWarning(null);
     try {
       const fd = new FormData();
       fd.set("file", list[0]);
@@ -242,6 +255,13 @@ export function DocUpload({
       </div>
 
       {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
+
+      {/* Wrong-document rejection: the file was deleted; ask for the correct one. */}
+      {warning && (
+        <p className="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-400">
+          {warning}
+        </p>
+      )}
 
       {/* Document Intelligence status (only for the extractable, uploaded docs) */}
       {file && extractable && analyze === "reading" && (

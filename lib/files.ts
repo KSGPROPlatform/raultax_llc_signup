@@ -64,7 +64,10 @@ export async function uploadFile(
   bytes: ArrayBuffer,
   docType?: string | null,
   jobId?: number | null,
+  taxYear?: number | null,
 ): Promise<UserFile> {
+  // Stamp the current year at upload time (auto-detected, no selector).
+  const year = taxYear ?? new Date().getFullYear();
   const res = await fetch(
     fnUrl("uploadFile", {
       oid,
@@ -72,6 +75,7 @@ export async function uploadFile(
       contentType,
       docType: docType ?? undefined,
       jobId: jobId ?? undefined,
+      taxYear: year,
     }),
     {
       method: "POST",

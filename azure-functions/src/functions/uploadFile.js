@@ -33,6 +33,8 @@ app.http("uploadFile", {
       const docType = request.query.get("docType") || null; // category; null = uncategorised
       const jobIdRaw = request.query.get("jobId");
       const jobId = jobIdRaw && /^\d+$/.test(jobIdRaw) ? Number(jobIdRaw) : null; // links W-2/1099 to a job
+      const taxYearRaw = request.query.get("taxYear");
+      const taxYear = taxYearRaw && /^\d{4}$/.test(taxYearRaw) ? Number(taxYearRaw) : null; // tax year (raultax only)
       if (!oid) return { status: 400, jsonBody: { error: "oid is required" } };
 
       const raw = Buffer.from(await request.arrayBuffer());
@@ -56,7 +58,7 @@ app.http("uploadFile", {
       );
 
       const pool = await getPool();
-      const result = await pool
+      const req = pool
         .request()
         .input("oid", sql.NVarChar(64), oid)
         .input("blob", sql.NVarChar(512), blobName)
@@ -66,14 +68,28 @@ app.http("uploadFile", {
         .input("stored", sql.BigInt, storedBytes)
         .input("comp", sql.Bit, compress ? 1 : 0)
         .input("docType", sql.NVarChar(64), docType)
-        .input("jobId", sql.Int, jobId).query(`
-          INSERT INTO ${cfg.filesTable}
-            (owner_oid, blob_name, original_name, content_type, size_bytes, stored_bytes, is_compressed, doc_type, job_id)
-          OUTPUT inserted.id, inserted.owner_oid, inserted.blob_name,
-                 inserted.original_name, inserted.content_type, inserted.size_bytes,
-                 inserted.stored_bytes, inserted.is_compressed, inserted.doc_type, inserted.job_id, inserted.uploaded_at
-          VALUES (@oid, @blob, @name, @ctype, @size, @stored, @comp, @docType, @jobId);
-        `);
+        .input("jobId", sql.Int, jobId);
+
+      // tax_year is optional (only raultax passes it). Add it to the INSERT only
+      // when present, so apps whose files table lacks the column are unaffected.
+      const cols = [
+        "owner_oid", "blob_name", "original_name", "content_type", "size_bytes",
+        "stored_bytes", "is_compressed", "doc_type", "job_id",
+      ];
+      const vals = ["@oid", "@blob", "@name", "@ctype", "@size", "@stored", "@comp", "@docType", "@jobId"];
+      if (taxYear != null) {
+        req.input("taxYear", sql.Int, taxYear);
+        cols.push("tax_year");
+        vals.push("@taxYear");
+      }
+
+      const result = await req.query(`
+        INSERT INTO ${cfg.filesTable} (${cols.join(", ")})
+        OUTPUT inserted.id, inserted.owner_oid, inserted.blob_name,
+               inserted.original_name, inserted.content_type, inserted.size_bytes,
+               inserted.stored_bytes, inserted.is_compressed, inserted.doc_type, inserted.job_id, inserted.uploaded_at
+        VALUES (${vals.join(", ")});
+      `);
 
       return { status: 200, jsonBody: result.recordset[0] };
     } catch (err) {

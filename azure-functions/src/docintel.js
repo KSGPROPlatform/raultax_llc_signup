@@ -107,26 +107,32 @@ function detect1099Variant(text) {
   return null;
 }
 
+// Stage 1 gate: a real document of the expected type comes back as a confident
+// document WITH fields. A wrong file (random PDF, unrelated form) comes back with
+// no documents / very low confidence -> we reject it as a mismatch.
+const MIN_CONFIDENCE = 0.5;
+function isRightDocument(doc) {
+  if (!doc) return false;
+  const conf = doc.confidence != null ? doc.confidence : 0;
+  const hasFields = doc.fields && Object.keys(doc.fields).length > 0;
+  return conf >= MIN_CONFIDENCE && hasFields;
+}
+
 async function analyzeStructured(model, bytes, extra) {
   const r = await analyze(model, bytes);
-  const doc = (r.documents && r.documents[0]) || {};
-  const { flat, rich } = normalize(doc.fields);
+  const doc = (r.documents && r.documents[0]) || null;
+  if (!isRightDocument(doc)) return { status: "mismatch", model }; // Stage 1 fail
+  const { flat, rich } = normalize(doc.fields); // Stage 2
   return { status: "done", model, flat: { ...flat, ...(extra || {}) }, rich };
 }
 
-// A 1099 could be any variant — OCR to find which, then run that model.
+// A 1099 could be any variant — OCR to find which, then run that model. No
+// variant found in the text -> it isn't a 1099 -> mismatch.
 async function analyze1099(bytes) {
   const read = await analyze("prebuilt-read", bytes);
   const text = read.content || "";
   const variantModel = detect1099Variant(text);
-  if (!variantModel) {
-    return {
-      status: "done",
-      model: "prebuilt-read",
-      flat: { variant: "unknown", text: text.slice(0, 2000) },
-      rich: {},
-    };
-  }
+  if (!variantModel) return { status: "mismatch", model: "prebuilt-read" };
   return analyzeStructured(variantModel, bytes, {
     variant: variantModel.replace("prebuilt-tax.us.1099", ""),
   });
@@ -140,9 +146,11 @@ async function analyzeForDocType(docType, bytes) {
   if (model === "__1099__") return analyze1099(bytes);
 
   if (model === "prebuilt-read") {
+    // SSN card: must actually contain an SSN pattern, else it's the wrong doc.
     const r = await analyze("prebuilt-read", bytes);
     const content = r.content || "";
     const ssn = extractSsn(content);
+    if (!ssn) return { status: "mismatch", model: "prebuilt-read" };
     return {
       status: "done",
       model: "prebuilt-read",

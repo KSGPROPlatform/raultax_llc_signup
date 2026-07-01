@@ -15,6 +15,7 @@ CREATE TABLE raul_tax_file_extractions (
     status       NVARCHAR(32)  NOT NULL DEFAULT 'pending', -- pending|done|unsupported|error
     fields_json  NVARCHAR(MAX) NULL,                -- flat { key: value }
     rich_json    NVARCHAR(MAX) NULL,                -- { key: { value, confidence } }
+    tax_year     INT           NULL,                -- the tax year the file belongs to
     error        NVARCHAR(512) NULL,
     created_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
     updated_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME()
