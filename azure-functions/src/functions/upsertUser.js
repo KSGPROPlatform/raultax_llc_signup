@@ -32,7 +32,6 @@ app.http("upsertUser", {
         .input("date_of_birth", sql.NVarChar(32), b.date_of_birth ?? null)
         .input("filing_status", sql.NVarChar(64), b.filing_status ?? null)
         .input("marital_status", sql.NVarChar(64), b.marital_status ?? null)
-        .input("job_title", sql.NVarChar(128), b.job_title ?? null)
         .input("phone_number", sql.NVarChar(32), b.phone_number ?? null)
         .input("ssn", sql.NVarChar(32), b.ssn ?? null)
         .input("street_address", sql.NVarChar(256), b.street_address ?? null)
@@ -55,7 +54,6 @@ app.http("upsertUser", {
               date_of_birth  = COALESCE(@date_of_birth, date_of_birth),
               filing_status  = COALESCE(@filing_status, filing_status),
               marital_status = COALESCE(@marital_status, marital_status),
-              job_title      = COALESCE(@job_title, job_title),
               phone_number   = COALESCE(@phone_number, phone_number),
               ssn            = COALESCE(@ssn, ssn),
               street_address = COALESCE(@street_address, street_address),
@@ -68,14 +66,14 @@ app.http("upsertUser", {
           WHEN NOT MATCHED THEN
             INSERT (entra_object_id, email, name, role,
                     first_name, last_name, middle_name, date_of_birth, filing_status,
-                    marital_status, job_title, phone_number, ssn,
+                    marital_status, phone_number, ssn,
                     street_address, city, state_province, postal_code,
                     owns_establishment, onboarding_completed,
                     created_at, updated_at)
             VALUES (@oid, @email, @name, 'user',
                     ISNULL(@first_name, ''), ISNULL(@last_name, ''), ISNULL(@middle_name, ''),
                     ISNULL(@date_of_birth, ''), ISNULL(@filing_status, ''),
-                    ISNULL(@marital_status, ''), ISNULL(@job_title, ''),
+                    ISNULL(@marital_status, ''),
                     ISNULL(@phone_number, ''), ISNULL(@ssn, ''),
                     ISNULL(@street_address, ''), ISNULL(@city, ''),
                     ISNULL(@state_province, ''), ISNULL(@postal_code, ''),

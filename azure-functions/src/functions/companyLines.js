@@ -40,7 +40,7 @@ app.http("companyLines", {
           .request()
           .input("oid", sql.NVarChar(64), oid)
           .input("cid", sql.Int, companyId).query(`
-            SELECT id, owner_oid, company_id, kind, category, description, amount,
+            SELECT id, owner_oid, company_id, kind, description, amount,
                    created_at, updated_at
             FROM raul_tax_company_lines
             WHERE owner_oid = @oid AND company_id = @cid
@@ -63,20 +63,19 @@ app.http("companyLines", {
           .input("oid", sql.NVarChar(64), b.oid)
           .input("cid", sql.Int, companyId)
           .input("kind", sql.NVarChar(16), kind)
-          .input("category", sql.NVarChar(64), b.category ?? "")
           .input("description", sql.NVarChar(256), b.description ?? "")
           .input("amount", sql.Decimal(18, 2), Number.isFinite(amount) ? Math.abs(amount) : 0);
 
         const OUTPUT = `
           OUTPUT inserted.id, inserted.owner_oid, inserted.company_id, inserted.kind,
-                 inserted.category, inserted.description, inserted.amount,
+                 inserted.description, inserted.amount,
                  inserted.created_at, inserted.updated_at`;
 
         let row;
         if (b.id) {
           const result = await req.input("id", sql.Int, Number(b.id)).query(`
             UPDATE raul_tax_company_lines
-            SET kind = @kind, category = @category, description = @description,
+            SET kind = @kind, description = @description,
                 amount = @amount, updated_at = SYSUTCDATETIME()
             ${OUTPUT}
             WHERE id = @id AND owner_oid = @oid AND company_id = @cid;
@@ -85,9 +84,9 @@ app.http("companyLines", {
           row = result.recordset[0];
         } else {
           const result = await req.query(`
-            INSERT INTO raul_tax_company_lines (owner_oid, company_id, kind, category, description, amount)
+            INSERT INTO raul_tax_company_lines (owner_oid, company_id, kind, description, amount)
             ${OUTPUT}
-            VALUES (@oid, @cid, @kind, @category, @description, @amount);
+            VALUES (@oid, @cid, @kind, @description, @amount);
           `);
           row = result.recordset[0];
         }
