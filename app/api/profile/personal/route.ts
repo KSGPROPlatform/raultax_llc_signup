@@ -11,10 +11,17 @@ export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const p = await getUserProfile(user.sub);
+  // Fallback: if the granular first/last name aren't stored (e.g. the account was
+  // created before they were captured, or a signup upsert failed), derive them
+  // from the session display name so Form 1 still pre-fills. First token = first
+  // name, the rest = last name.
+  const nameParts = (user.name || "").trim().split(/\s+/).filter(Boolean);
+  const fbFirst = nameParts[0] ?? "";
+  const fbLast = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
   const profile: PersonalInfoValues = {
-    first_name: p?.first_name ?? "",
+    first_name: p?.first_name || fbFirst,
     middle_name: p?.middle_name ?? "",
-    last_name: p?.last_name ?? "",
+    last_name: p?.last_name || fbLast,
     date_of_birth: p?.date_of_birth ?? "",
     marital_status: p?.marital_status ?? "",
     filing_status: p?.filing_status ?? "",
