@@ -10,7 +10,6 @@ export type Profile = {
   date_of_birth?: string;
   filing_status?: string;
   marital_status?: string;
-  job_title?: string;
   phone_number?: string;
   ssn?: string;
   street_address?: string;

@@ -259,7 +259,6 @@ export type SavedProfile = {
   date_of_birth: string | null;
   marital_status: string | null;
   filing_status: string | null;
-  job_title: string | null;
   phone_number: string | null;
   ssn: string | null;
   street_address: string | null;

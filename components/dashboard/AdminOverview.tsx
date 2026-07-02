@@ -281,7 +281,6 @@ function UserDetailModal({ oid, onClose }: { oid: string; onClose: () => void })
                   <Row label="Date of birth" value={u.date_of_birth} />
                   <Row label="Filing status" value={u.filing_status} />
                   <Row label="Marital status" value={u.marital_status} />
-                  <Row label="Job title" value={u.job_title} />
                   <Row label="Phone" value={u.phone_number} />
                   <Row label="SSN" value={maskTail(u.ssn)} />
                   <Row
