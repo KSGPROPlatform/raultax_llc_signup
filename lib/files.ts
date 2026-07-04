@@ -1,5 +1,5 @@
 import "server-only";
-import { isMultiple } from "./docTypes";
+import { isMultiple, isExtractable } from "./docTypes";
 
 // Server-side client for the file Azure Functions (uploadFile / listFiles /
 // viewFile / deleteFile) on ksgpro-api. Same base/key as upsertUser. The app's
@@ -65,6 +65,7 @@ export async function uploadFile(
   docType?: string | null,
   jobId?: number | null,
   taxYear?: number | null,
+  deferCompress?: boolean,
 ): Promise<UserFile> {
   // Stamp the current year at upload time (auto-detected, no selector).
   const year = taxYear ?? new Date().getFullYear();
@@ -76,6 +77,9 @@ export async function uploadFile(
       docType: docType ?? undefined,
       jobId: jobId ?? undefined,
       taxYear: year,
+      // Extractable images defer compression so Document Intelligence reads the
+      // full-quality original; analyzeDocument shrinks the stored copy after.
+      deferCompress: deferCompress ? "1" : undefined,
     }),
     {
       method: "POST",
@@ -103,7 +107,10 @@ export async function saveDocument(
   docType: string,
   jobId?: number | null,
 ): Promise<UserFile> {
-  const saved = await uploadFile(oid, filename, contentType, bytes, docType, jobId);
+  // Images we run Document Intelligence over defer compression so DI reads the
+  // full-quality original; analyzeDocument shrinks the stored copy afterwards.
+  const deferCompress = /^image\//i.test(contentType) && isExtractable(docType);
+  const saved = await uploadFile(oid, filename, contentType, bytes, docType, jobId, undefined, deferCompress);
   // Single-file slots replace the previous file: per-job docs (W-2/1099) are one
   // per job; non-job docs replace when the catalog marks them single (e.g. SSN).
   const single = jobId != null || (docType && !isMultiple(docType));
