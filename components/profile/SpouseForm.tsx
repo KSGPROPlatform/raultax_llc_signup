@@ -8,7 +8,7 @@ import { US_STATES } from "@/lib/usStates";
 import { SsnField } from "@/components/forms/SsnField";
 import { DateField } from "@/components/forms/DateField";
 import { DocUpload } from "@/components/documents/DocUpload";
-import { dobYearRange, validateDob } from "@/lib/validation";
+import { dobYearRange, validateDob, validateSsn } from "@/lib/validation";
 
 const STATE_NAMES = US_STATES.map((s) => s.name);
 
@@ -61,16 +61,16 @@ export function SpouseForm({
   const setVal = (k: keyof SpouseValues) => (value: string) =>
     setV((p) => ({ ...p, [k]: value }));
 
-  const [dobTouched, setDobTouched] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const range = dobYearRange(new Date().getFullYear());
   const dobErr = mode === "full" ? validateDob(v.date_of_birth, range) : null;
+  const ssnErr = validateSsn(v.ssn);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (mode === "full") {
-      setDobTouched(true);
-      if (dobErr) return; // DOB out of range blocks
-    }
+    setTouched({ ssn: true, date_of_birth: true });
+    if (ssnErr) return; // spouse SSN must be valid (both modes)
+    if (mode === "full" && dobErr) return;
     onSubmit(mode === "ssn" ? { ssn: v.ssn } : v);
   }
 
@@ -78,17 +78,17 @@ export function SpouseForm({
     <form onSubmit={submit} className="space-y-4">
       {mode === "full" && (
         <>
-          <Field id="sp_first_name" label="Spouse first name" required maxLength={256} value={v.first_name} onChange={setText("first_name")} autoComplete="off" />
-          <Field id="sp_last_name" label="Spouse last name" required maxLength={256} value={v.last_name} onChange={setText("last_name")} autoComplete="off" />
+          <Field id="sp_first_name" label="Spouse first name" required maxLength={256} placeholder="e.g. Jane" value={v.first_name} onChange={setText("first_name")} autoComplete="off" />
+          <Field id="sp_last_name" label="Spouse last name" required maxLength={256} placeholder="e.g. Doe" value={v.last_name} onChange={setText("last_name")} autoComplete="off" />
           <DateField
             id="sp_dob"
             label="Spouse date of birth"
             required
             value={v.date_of_birth}
             onChange={setVal("date_of_birth")}
-            onBlur={() => setDobTouched(true)}
-            error={dobTouched ? dobErr : null}
-            hint={`Must be between ${range.min} and ${range.max}.`}
+            onBlur={() => setTouched((t) => ({ ...t, date_of_birth: true }))}
+            error={touched.date_of_birth ? dobErr : null}
+            hint={v.date_of_birth ? undefined : `Must be between ${range.min} and ${range.max}.`}
           />
         </>
       )}
@@ -99,7 +99,9 @@ export function SpouseForm({
         required
         hint="Stored securely on your account."
         value={v.ssn}
+        error={touched.ssn ? ssnErr : null}
         onChange={setVal("ssn")}
+        onBlur={() => setTouched((t) => ({ ...t, ssn: true }))}
       />
 
       {mode === "full" && (

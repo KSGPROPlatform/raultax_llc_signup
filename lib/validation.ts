@@ -65,6 +65,30 @@ export function validateRequired(value: string, label: string): string | null {
   return value.trim() ? null : `${label} is required.`;
 }
 
+// Validate a US Social Security number (accepts formatted or plain digits).
+// Applies the SSA structural rules so obviously-fake numbers are rejected:
+//   area   (first 3)  ≠ 000, ≠ 666, and < 900 (900–999 are ITINs, not SSNs)
+//   group  (next 2)   ≠ 00
+//   serial (last 4)   ≠ 0000
+export function validateSsn(value: string): string | null {
+  const digits = (value || "").replace(/\D/g, "");
+  if (!digits) return "SSN is required.";
+  if (digits.length !== 9) return "SSN must be 9 digits (XXX-XX-XXXX).";
+  const area = digits.slice(0, 3);
+  const group = digits.slice(3, 5);
+  const serial = digits.slice(5);
+  if (
+    area === "000" ||
+    area === "666" ||
+    Number(area) >= 900 ||
+    group === "00" ||
+    serial === "0000"
+  ) {
+    return "That isn't a valid SSN.";
+  }
+  return null;
+}
+
 // US ZIP: 5 digits, optionally +4 (e.g. 10001 or 10001-2345).
 export function validateZip(value: string): string | null {
   const v = value.trim();

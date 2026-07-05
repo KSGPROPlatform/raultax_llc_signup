@@ -13,6 +13,7 @@ import {
   validateDob,
   validateName,
   validateRequired,
+  validateSsn,
   validateZip,
 } from "@/lib/validation";
 
@@ -79,6 +80,7 @@ export function PersonalInfoForm({
     first_name: validateName(v.first_name, "First name"),
     last_name: validateName(v.last_name, "Last name"),
     date_of_birth: validateDob(v.date_of_birth, range),
+    ssn: validateSsn(v.ssn),
     street_address: validateRequired(v.street_address, "Street address"),
     postal_code: validateZip(v.postal_code),
   };
@@ -102,6 +104,7 @@ export function PersonalInfoForm({
       first_name: true,
       last_name: true,
       date_of_birth: true,
+      ssn: true,
       street_address: true,
       postal_code: true,
     });
@@ -152,7 +155,7 @@ export function PersonalInfoForm({
         onChange={setValue("date_of_birth")}
         onBlur={touch("date_of_birth")}
         error={err("date_of_birth")}
-        hint={`Must be between ${range.min} and ${range.max}.`}
+        hint={v.date_of_birth ? undefined : `Must be between ${range.min} and ${range.max}.`}
       />
       <SelectField
         id="pi_marital_status"
@@ -183,7 +186,9 @@ export function PersonalInfoForm({
         required
         hint="Stored securely on your account."
         value={v.ssn}
+        error={err("ssn")}
         onChange={setValue("ssn")}
+        onBlur={touch("ssn")}
       />
       <DocUpload docType="ssn_copy" label="SSN document" />
       <Field
