@@ -2,14 +2,19 @@
 
 import { useState } from "react";
 import { Field, SelectField, FormButtons } from "@/components/forms/Field";
-import { ComboField } from "@/components/forms/ComboField";
 import { CityField } from "@/components/forms/CityField";
 import { US_STATES } from "@/lib/usStates";
 import { PhoneField } from "@/components/forms/PhoneField";
 import { SsnField } from "@/components/forms/SsnField";
 import { DateField } from "@/components/forms/DateField";
 import { DocUpload } from "@/components/documents/DocUpload";
-import { dobYearRange, validateDob } from "@/lib/validation";
+import {
+  dobYearRange,
+  validateDob,
+  validateName,
+  validateRequired,
+  validateZip,
+} from "@/lib/validation";
 
 const MARITAL_STATUS = ["Single", "Married", "Divorced", "Widowed", "Separated"];
 const FILING_STATUS = [
@@ -66,11 +71,19 @@ export function PersonalInfoForm({
   submitLabel?: string;
 }): React.JSX.Element {
   const [v, setV] = useState<PersonalInfoValues>({ ...EMPTY, ...initial });
-  const [dobTouched, setDobTouched] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   // Sliding birth-year window (1940–2016 in 2026, +1 each year).
   const range = dobYearRange(new Date().getFullYear());
-  const dobErr = validateDob(v.date_of_birth, range);
+  const errs: Record<string, string | null> = {
+    first_name: validateName(v.first_name, "First name"),
+    last_name: validateName(v.last_name, "Last name"),
+    date_of_birth: validateDob(v.date_of_birth, range),
+    street_address: validateRequired(v.street_address, "Street address"),
+    postal_code: validateZip(v.postal_code),
+  };
+  const err = (k: string) => (touched[k] ? errs[k] : null);
+  const touch = (k: string) => () => setTouched((t) => ({ ...t, [k]: true }));
 
   const setText =
     (k: keyof PersonalInfoValues) =>
@@ -85,8 +98,14 @@ export function PersonalInfoForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setDobTouched(true);
-    if (validateDob(v.date_of_birth, range)) return; // DOB out of range blocks
+    setTouched({
+      first_name: true,
+      last_name: true,
+      date_of_birth: true,
+      street_address: true,
+      postal_code: true,
+    });
+    if (Object.values(errs).some(Boolean)) return; // block on any invalid field
     onSubmit(v);
   }
 
@@ -97,14 +116,18 @@ export function PersonalInfoForm({
         label="First name"
         required
         maxLength={256}
+        placeholder="e.g. John"
         value={v.first_name}
+        error={err("first_name")}
         onChange={setText("first_name")}
+        onBlur={touch("first_name")}
         autoComplete="given-name"
       />
       <Field
         id="pi_middle_name"
         label="Middle name (optional)"
         maxLength={256}
+        placeholder="e.g. Michael"
         value={v.middle_name}
         onChange={setText("middle_name")}
         autoComplete="additional-name"
@@ -114,8 +137,11 @@ export function PersonalInfoForm({
         label="Last name"
         required
         maxLength={256}
+        placeholder="e.g. Doe"
         value={v.last_name}
+        error={err("last_name")}
         onChange={setText("last_name")}
+        onBlur={touch("last_name")}
         autoComplete="family-name"
       />
       <DateField
@@ -124,8 +150,8 @@ export function PersonalInfoForm({
         required
         value={v.date_of_birth}
         onChange={setValue("date_of_birth")}
-        onBlur={() => setDobTouched(true)}
-        error={dobTouched ? dobErr : null}
+        onBlur={touch("date_of_birth")}
+        error={err("date_of_birth")}
         hint={`Must be between ${range.min} and ${range.max}.`}
       />
       <SelectField
@@ -165,22 +191,26 @@ export function PersonalInfoForm({
         label="Street address"
         required
         maxLength={256}
+        placeholder="e.g. 123 Main St"
         value={v.street_address}
+        error={err("street_address")}
         onChange={setText("street_address")}
+        onBlur={touch("street_address")}
         autoComplete="street-address"
       />
-      <ComboField
+      <SelectField
         id="pi_state_province"
         label="State"
         required
         value={v.state_province}
-        onChange={setValue("state_province")}
+        onChange={setSelect("state_province")}
         options={STATE_NAMES}
       />
       <CityField
         id="pi_city"
         label="City"
         required
+        placeholder="e.g. New York"
         value={v.city}
         onChange={setValue("city")}
         state={v.state_province}
@@ -190,8 +220,12 @@ export function PersonalInfoForm({
         label="Postal code"
         required
         maxLength={16}
+        inputMode="numeric"
+        placeholder="e.g. 10001"
         value={v.postal_code}
+        error={err("postal_code")}
         onChange={setText("postal_code")}
+        onBlur={touch("postal_code")}
         autoComplete="postal-code"
       />
       <FormButtons busy={busy} submitLabel={submitLabel} />

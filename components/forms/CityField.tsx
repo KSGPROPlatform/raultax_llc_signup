@@ -15,6 +15,7 @@ export function CityField({
   onChange,
   state,
   required,
+  placeholder,
 }: {
   id: string;
   label: string;
@@ -22,6 +23,7 @@ export function CityField({
   onChange: (value: string) => void;
   state: string;
   required?: boolean;
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -91,6 +93,7 @@ export function CityField({
           type="text"
           value={value}
           required={required}
+          placeholder={placeholder}
           autoComplete="off"
           role="combobox"
           aria-expanded={showList}

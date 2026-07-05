@@ -61,6 +61,18 @@ export function validatePassword(pw: string): string | null {
   return null;
 }
 
+export function validateRequired(value: string, label: string): string | null {
+  return value.trim() ? null : `${label} is required.`;
+}
+
+// US ZIP: 5 digits, optionally +4 (e.g. 10001 or 10001-2345).
+export function validateZip(value: string): string | null {
+  const v = value.trim();
+  if (!v) return "Postal code is required.";
+  if (!/^\d{5}(-\d{4})?$/.test(v)) return "Enter a valid ZIP (e.g. 10001 or 10001-2345).";
+  return null;
+}
+
 // Allowed birth-year window for an adult filer/spouse. Slides every year: in
 // 2026 it's 1940–2016 (min age 10, max age 86), 1941–2017 in 2027, and so on —
 // because it's derived from the current year, not hard-coded.
