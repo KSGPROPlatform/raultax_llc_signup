@@ -8,6 +8,7 @@ export function Field({
   id,
   label,
   hint,
+  error,
   required,
   className,
   ...props
@@ -15,15 +16,24 @@ export function Field({
   id: string;
   label: string;
   hint?: string;
+  error?: string | null;
 }) {
+  const base = className ?? fieldClass;
+  const cls = error
+    ? `${base} border-red-400 focus:border-red-500 focus:ring-red-500/20 dark:border-red-500/60`
+    : base;
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className={labelClass}>
         {label}
         {required && <span className="text-amber-500"> *</span>}
       </label>
-      <input id={id} required={required} className={className ?? fieldClass} {...props} />
-      {hint && <p className="text-xs text-zinc-400">{hint}</p>}
+      <input id={id} required={required} aria-invalid={Boolean(error)} className={cls} {...props} />
+      {error ? (
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      ) : hint ? (
+        <p className="text-xs text-zinc-400">{hint}</p>
+      ) : null}
     </div>
   );
 }

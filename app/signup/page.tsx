@@ -10,7 +10,9 @@ import {
   fieldClass,
   linkClass,
 } from "@/components/auth/AuthShell";
-import { Field as Text } from "@/components/forms/Field";
+import { Field } from "@/components/forms/Field";
+import { PasswordField } from "@/components/forms/PasswordField";
+import { validateEmail, validateName, validatePassword } from "@/lib/validation";
 import { postJson } from "@/lib/api";
 
 export default function SignupPage() {
@@ -23,17 +25,23 @@ export default function SignupPage() {
   const [continuationToken, setContinuationToken] = useState("");
   const [target, setTarget] = useState<string | null>(null);
   const [otp, setOtp] = useState("");
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const errs = {
+    first: validateName(firstName, "First name"),
+    last: validateName(lastName, "Last name"),
+    email: validateEmail(email),
+    password: validatePassword(password),
+  };
+  const formValid = !errs.first && !errs.last && !errs.email && !errs.password;
 
   // Start native sign-up (email + password) -> Entra sends an OTP email.
   async function startSignup(e: React.FormEvent) {
     e.preventDefault();
-    if (!firstName.trim() || !lastName.trim())
-      return setError("First and last name are required.");
-    if (!email) return setError("Email is required.");
-    if (password.length < 8)
-      return setError("Password must be at least 8 characters.");
+    setTouched({ first_name: true, last_name: true, email: true, password: true });
+    if (!formValid) return; // inline errors + the strength meter guide the user
     setError(null);
     setLoading(true);
     // first + last become the Entra display name (and our stored name).
@@ -79,7 +87,7 @@ export default function SignupPage() {
       >
         <form onSubmit={verify} className="space-y-4">
           <FormError message={error} />
-          <Text
+          <Field
             id="otp"
             label="Verification code"
             value={otp}
@@ -121,43 +129,49 @@ export default function SignupPage() {
         </>
       }
     >
-      <form onSubmit={startSignup} className="space-y-4">
+      <form onSubmit={startSignup} className="space-y-4" noValidate>
         <FormError message={error} />
-        <Text
+        <Field
           id="first_name"
           label="First name"
           required
           autoComplete="given-name"
           value={firstName}
+          error={touched.first_name ? errs.first : null}
           onChange={(e) => setFirstName(e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, first_name: true }))}
         />
-        <Text
+        <Field
           id="last_name"
           label="Last name"
           required
           autoComplete="family-name"
           value={lastName}
+          error={touched.last_name ? errs.last : null}
           onChange={(e) => setLastName(e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, last_name: true }))}
         />
-        <Text
+        <Field
           id="email"
           label="Email"
           type="email"
           required
           autoComplete="email"
           value={email}
+          error={touched.email ? errs.email : null}
           onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, email: true }))}
         />
-        <Text
+        <PasswordField
           id="password"
           label="Password"
-          type="password"
           required
-          minLength={8}
           autoComplete="new-password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          hint="At least 8 characters."
+          error={touched.password ? errs.password : null}
+          showStrength
+          onChange={setPassword}
+          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
         />
         <button type="submit" disabled={loading} className={buttonClass}>
           {loading ? "Sending code…" : "Create account"}

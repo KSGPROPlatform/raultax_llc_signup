@@ -3,14 +3,10 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  AuthShell,
-  FormError,
-  buttonClass,
-  fieldClass,
-  labelClass,
-  linkClass,
-} from "@/components/auth/AuthShell";
+import { AuthShell, FormError, buttonClass, linkClass } from "@/components/auth/AuthShell";
+import { Field } from "@/components/forms/Field";
+import { PasswordField } from "@/components/forms/PasswordField";
+import { validateEmail } from "@/lib/validation";
 import { postJson } from "@/lib/api";
 
 function LoginForm() {
@@ -19,11 +15,17 @@ function LoginForm() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [touched, setTouched] = useState<{ email?: boolean; password?: boolean }>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const emailErr = touched.email ? validateEmail(email) : null;
+  const passwordErr = touched.password && !password ? "Password is required." : null;
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setTouched({ email: true, password: true });
+    if (validateEmail(email) || !password) return; // inline errors show
     setError(null);
     setLoading(true);
     const { ok, error } = await postJson("/api/auth/signin", { email, password });
@@ -49,37 +51,30 @@ function LoginForm() {
         </>
       }
     >
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="space-y-4" noValidate>
         <FormError message={error} />
-        <div className="space-y-1.5">
-          <label htmlFor="email" className={labelClass}>Email</label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={fieldClass}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <label htmlFor="password" className={labelClass}>Password</label>
-            <Link href="/reset-password" className="text-xs font-medium text-amber-600 hover:underline dark:text-amber-400">
-              Forgot?
-            </Link>
-          </div>
-          <input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={fieldClass}
-          />
-        </div>
+        <Field
+          id="email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          error={emailErr}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+        />
+        <PasswordField
+          id="password"
+          label="Password"
+          autoComplete="current-password"
+          required
+          value={password}
+          error={passwordErr}
+          forgotHref="/reset-password"
+          onChange={setPassword}
+          onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+        />
         <button type="submit" disabled={loading} className={buttonClass}>
           {loading ? "Signing in…" : "Sign in"}
         </button>
