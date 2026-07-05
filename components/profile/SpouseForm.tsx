@@ -8,6 +8,7 @@ import { US_STATES } from "@/lib/usStates";
 import { SsnField } from "@/components/forms/SsnField";
 import { DateField } from "@/components/forms/DateField";
 import { DocUpload } from "@/components/documents/DocUpload";
+import { dobYearRange, validateDob } from "@/lib/validation";
 
 const STATE_NAMES = US_STATES.map((s) => s.name);
 
@@ -60,19 +61,35 @@ export function SpouseForm({
   const setVal = (k: keyof SpouseValues) => (value: string) =>
     setV((p) => ({ ...p, [k]: value }));
 
+  const [dobTouched, setDobTouched] = useState(false);
+  const range = dobYearRange(new Date().getFullYear());
+  const dobErr = mode === "full" ? validateDob(v.date_of_birth, range) : null;
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (mode === "full") {
+      setDobTouched(true);
+      if (dobErr) return; // DOB out of range blocks
+    }
+    onSubmit(mode === "ssn" ? { ssn: v.ssn } : v);
+  }
+
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit(mode === "ssn" ? { ssn: v.ssn } : v);
-      }}
-      className="space-y-4"
-    >
+    <form onSubmit={submit} className="space-y-4">
       {mode === "full" && (
         <>
           <Field id="sp_first_name" label="Spouse first name" required maxLength={256} value={v.first_name} onChange={setText("first_name")} autoComplete="off" />
           <Field id="sp_last_name" label="Spouse last name" required maxLength={256} value={v.last_name} onChange={setText("last_name")} autoComplete="off" />
-          <DateField id="sp_dob" label="Spouse date of birth" required value={v.date_of_birth} onChange={setVal("date_of_birth")} />
+          <DateField
+            id="sp_dob"
+            label="Spouse date of birth"
+            required
+            value={v.date_of_birth}
+            onChange={setVal("date_of_birth")}
+            onBlur={() => setDobTouched(true)}
+            error={dobTouched ? dobErr : null}
+            hint={`Must be between ${range.min} and ${range.max}.`}
+          />
         </>
       )}
 

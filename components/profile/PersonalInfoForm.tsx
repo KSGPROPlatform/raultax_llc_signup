@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Field, FormButtons } from "@/components/forms/Field";
+import { Field, SelectField, FormButtons } from "@/components/forms/Field";
 import { ComboField } from "@/components/forms/ComboField";
 import { CityField } from "@/components/forms/CityField";
 import { US_STATES } from "@/lib/usStates";
@@ -9,6 +9,7 @@ import { PhoneField } from "@/components/forms/PhoneField";
 import { SsnField } from "@/components/forms/SsnField";
 import { DateField } from "@/components/forms/DateField";
 import { DocUpload } from "@/components/documents/DocUpload";
+import { dobYearRange, validateDob } from "@/lib/validation";
 
 const MARITAL_STATUS = ["Single", "Married", "Divorced", "Widowed", "Separated"];
 const FILING_STATUS = [
@@ -65,6 +66,11 @@ export function PersonalInfoForm({
   submitLabel?: string;
 }): React.JSX.Element {
   const [v, setV] = useState<PersonalInfoValues>({ ...EMPTY, ...initial });
+  const [dobTouched, setDobTouched] = useState(false);
+
+  // Sliding birth-year window (1940–2016 in 2026, +1 each year).
+  const range = dobYearRange(new Date().getFullYear());
+  const dobErr = validateDob(v.date_of_birth, range);
 
   const setText =
     (k: keyof PersonalInfoValues) =>
@@ -72,15 +78,20 @@ export function PersonalInfoForm({
       setV((p) => ({ ...p, [k]: e.target.value }));
   const setValue = (k: keyof PersonalInfoValues) => (value: string) =>
     setV((p) => ({ ...p, [k]: value }));
+  const setSelect =
+    (k: keyof PersonalInfoValues) =>
+    (e: React.ChangeEvent<HTMLSelectElement>) =>
+      setV((p) => ({ ...p, [k]: e.target.value }));
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setDobTouched(true);
+    if (validateDob(v.date_of_birth, range)) return; // DOB out of range blocks
+    onSubmit(v);
+  }
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit(v);
-      }}
-      className="space-y-4"
-    >
+    <form onSubmit={handleSubmit} className="space-y-4">
       <Field
         id="pi_first_name"
         label="First name"
@@ -113,21 +124,24 @@ export function PersonalInfoForm({
         required
         value={v.date_of_birth}
         onChange={setValue("date_of_birth")}
+        onBlur={() => setDobTouched(true)}
+        error={dobTouched ? dobErr : null}
+        hint={`Must be between ${range.min} and ${range.max}.`}
       />
-      <ComboField
+      <SelectField
         id="pi_marital_status"
         label="Marital status"
         required
         value={v.marital_status}
-        onChange={setValue("marital_status")}
+        onChange={setSelect("marital_status")}
         options={MARITAL_STATUS}
       />
-      <ComboField
+      <SelectField
         id="pi_filing_status"
         label="Filing status"
         required
         value={v.filing_status}
-        onChange={setValue("filing_status")}
+        onChange={setSelect("filing_status")}
         options={FILING_STATUS}
       />
       <PhoneField

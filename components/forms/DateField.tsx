@@ -20,16 +20,23 @@ export function DateField({
   label,
   value,
   onChange,
+  onBlur,
   required,
   hint,
+  error,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   required?: boolean;
   hint?: string;
+  error?: string | null;
 }) {
+  const cls = `${fieldClass} ${
+    error ? "border-red-400 focus:border-red-500 focus:ring-red-500/20 dark:border-red-500/60" : ""
+  }`;
   return (
     <div className="space-y-1.5">
       <label htmlFor={id} className={labelClass}>
@@ -45,10 +52,16 @@ export function DateField({
         maxLength={10}
         required={required}
         value={value}
-        className={fieldClass}
+        aria-invalid={Boolean(error)}
+        className={cls}
         onChange={(e) => onChange(formatDate(e.target.value))}
+        onBlur={onBlur}
       />
-      {hint && <p className="text-xs text-zinc-400">{hint}</p>}
+      {error ? (
+        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+      ) : hint ? (
+        <p className="text-xs text-zinc-400">{hint}</p>
+      ) : null}
     </div>
   );
 }

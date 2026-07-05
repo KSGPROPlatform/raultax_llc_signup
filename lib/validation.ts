@@ -61,6 +61,36 @@ export function validatePassword(pw: string): string | null {
   return null;
 }
 
+// Allowed birth-year window for an adult filer/spouse. Slides every year: in
+// 2026 it's 1940–2016 (min age 10, max age 86), 1941–2017 in 2027, and so on —
+// because it's derived from the current year, not hard-coded.
+export function dobYearRange(currentYear: number): { min: number; max: number } {
+  return { min: currentYear - 86, max: currentYear - 10 };
+}
+
+// Validate an MM/DD/YYYY date. When `range` is given, the year must fall inside it.
+export function validateDob(
+  value: string,
+  range?: { min: number; max: number },
+): string | null {
+  if (!value.trim()) return "Date of birth is required.";
+  const m = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return "Enter the date as MM/DD/YYYY.";
+  const mm = Number(m[1]);
+  const dd = Number(m[2]);
+  const yyyy = Number(m[3]);
+  if (mm < 1 || mm > 12) return "Enter a valid month (01–12).";
+  if (dd < 1 || dd > 31) return "Enter a valid day.";
+  const d = new Date(yyyy, mm - 1, dd);
+  if (d.getFullYear() !== yyyy || d.getMonth() !== mm - 1 || d.getDate() !== dd) {
+    return "That date doesn't exist.";
+  }
+  if (range && (yyyy < range.min || yyyy > range.max)) {
+    return `Year of birth must be between ${range.min} and ${range.max}.`;
+  }
+  return null;
+}
+
 // 0..4 strength score for the meter.
 export function passwordStrength(pw: string): { score: number; label: string } {
   if (!pw) return { score: 0, label: "" };
