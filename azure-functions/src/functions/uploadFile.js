@@ -3,20 +3,19 @@ const { randomUUID } = require("node:crypto");
 const { sql, getPool } = require("../db");
 const { uploadBuffer, gzip } = require("../blob");
 const { getAppConfig } = require("../config");
-const { compressImage, isCompressibleImage } = require("../imageCompress");
+const { compressImageToTarget, isCompressibleImage } = require("../imageCompress");
 
-// POST /api/uploadFile?oid=&filename=&contentType=&deferCompress=  header: X-App-Id
+// POST /api/uploadFile?oid=&filename=&contentType=  header: X-App-Id
 // body: raw file bytes. Stores the file in the app's Blob container and records a
 // row in the app's files table. Called server-to-server by the calling app.
-//   - Images > IMAGE_THRESHOLD are RE-ENCODED small (JPEG) so storage stays in KB.
+//   - Images > IMAGE_THRESHOLD are RE-ENCODED down to <= STORE_MAX_BYTES (JPEG),
+//     so storage stays small AND the file is under Document Intelligence's input
+//     size limit (extraction runs on the stored copy).
 //   - Non-images > THRESHOLD are gzip-compressed (restored on view/download).
-//   - deferCompress=1 stores the image untouched (caller will compress later, e.g.
-//     raultax keeps the original so Document Intelligence extracts on full quality,
-//     then shrinks it afterwards).
 const THRESHOLD = Number(process.env.COMPRESS_THRESHOLD_BYTES || 5 * 1024 * 1024);
 const IMAGE_THRESHOLD = Number(process.env.IMAGE_COMPRESS_THRESHOLD_BYTES || 1024 * 1024); // 1 MB
-const STORE_MAX_DIM = Number(process.env.IMAGE_STORE_MAX_DIM || 1500);
-const STORE_QUALITY = Number(process.env.IMAGE_STORE_QUALITY || 68);
+const STORE_MAX_DIM = Number(process.env.IMAGE_STORE_MAX_DIM || 2000);
+const STORE_MAX_BYTES = Number(process.env.IMAGE_STORE_MAX_BYTES || 900 * 1024); // < 1 MB
 
 app.http("uploadFile", {
   methods: ["POST"],
@@ -43,8 +42,6 @@ app.http("uploadFile", {
       const jobId = jobIdRaw && /^\d+$/.test(jobIdRaw) ? Number(jobIdRaw) : null; // links W-2/1099 to a job
       const taxYearRaw = request.query.get("taxYear");
       const taxYear = taxYearRaw && /^\d{4}$/.test(taxYearRaw) ? Number(taxYearRaw) : null; // tax year (raultax only)
-      const deferCompress =
-        request.query.get("deferCompress") === "1" || request.query.get("deferCompress") === "true";
       if (!oid) return { status: 400, jsonBody: { error: "oid is required" } };
 
       const raw = Buffer.from(await request.arrayBuffer());
@@ -58,10 +55,13 @@ app.http("uploadFile", {
       let gz = false; // is_compressed (gzip)
       let imageCompressed = false;
 
-      // Images: re-encode small (unless the caller defers compression).
-      if (isImage && !deferCompress && sizeBytes > IMAGE_THRESHOLD && isCompressibleImage(contentType)) {
+      // Images over the threshold: re-encode down under the byte budget.
+      if (isImage && sizeBytes > IMAGE_THRESHOLD && isCompressibleImage(contentType)) {
         try {
-          const c = await compressImage(raw, { maxDim: STORE_MAX_DIM, quality: STORE_QUALITY });
+          const c = await compressImageToTarget(raw, {
+            maxDim: STORE_MAX_DIM,
+            maxBytes: STORE_MAX_BYTES,
+          });
           if (c.contentType === "image/jpeg") {
             data = c.buffer;
             dbContentType = "image/jpeg";

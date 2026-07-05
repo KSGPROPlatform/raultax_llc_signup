@@ -1,14 +1,11 @@
 const { app } = require("@azure/functions");
 const { sql, getPool } = require("../db");
-const { downloadBuffer, gunzip, deleteBlob, uploadBuffer } = require("../blob");
+const { downloadBuffer, gunzip, deleteBlob } = require("../blob");
 const { getAppConfig } = require("../config");
 const { analyzeForDocType } = require("../docintel");
-const { compressImage } = require("../imageCompress");
 
-// Extract-first, then compress hard: once DI has read the full-quality original,
-// the stored copy only needs to stay human-legible, so we shrink it aggressively.
-const STORE_MAX_DIM = Number(process.env.IMAGE_STORE_MAX_DIM || 1500);
-const STORE_QUALITY = Number(process.env.IMAGE_STORE_QUALITY || 68);
+// The stored file is already compressed small at upload (under the DI input-size
+// limit), so this function just reads it, extracts, and gates — no re-compression.
 
 // /api/analyzeDocument — run Azure Document Intelligence over an uploaded file
 // and store the structured result in raul_tax_file_extractions (one per file).
@@ -148,33 +145,6 @@ app.http("analyzeDocument", {
         error: null,
       });
 
-      // Extract-first, then compress hard: the original was kept (deferCompress)
-      // so DI could read it at full quality; now shrink the stored copy and swap
-      // it in place. Best-effort — a failure here never fails the extraction.
-      let storedBytes = null;
-      if (/^image\//i.test(file.content_type || "")) {
-        try {
-          const c = await compressImage(bytes, { maxDim: STORE_MAX_DIM, quality: STORE_QUALITY });
-          if (c.contentType === "image/jpeg" && c.buffer.length < bytes.length) {
-            await uploadBuffer(cfg.container, file.blob_name, c.buffer, "image/jpeg");
-            await pool
-              .request()
-              .input("oid", sql.NVarChar(64), oid)
-              .input("fid", sql.Int, fileId)
-              .input("ct", sql.NVarChar(128), "image/jpeg")
-              .input("sb", sql.BigInt, c.buffer.length)
-              .query(`
-                UPDATE ${cfg.filesTable}
-                SET content_type = @ct, stored_bytes = @sb, is_compressed = 0
-                WHERE id = @fid AND owner_oid = @oid;
-              `);
-            storedBytes = c.buffer.length;
-          }
-        } catch (e) {
-          context.error("post-extract compress failed", e && e.message);
-        }
-      }
-
       return {
         status: 200,
         jsonBody: {
@@ -183,7 +153,6 @@ app.http("analyzeDocument", {
           model: result.model ?? null,
           status: result.status,
           tax_year: taxYear,
-          stored_bytes: storedBytes,
           fields: result.flat ?? null,
         },
       };
