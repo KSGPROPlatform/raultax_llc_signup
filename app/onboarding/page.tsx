@@ -313,6 +313,20 @@ export default function OnboardingPage() {
             )}
           </div>
 
+          {/* The Personal info step's Continue is the form's own submit, so it
+              only needs a Back (to the tax-year step) here. */}
+          {currentKey === "personal" && safeStep > 0 && (
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setStep((s) => Math.max(0, s - 1))}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back
+              </button>
+            </div>
+          )}
+
           {/* Nav — the Personal info step uses the form's own submit for
               "Continue", so the generic footer renders for every other step. */}
           {currentKey !== "personal" && (
