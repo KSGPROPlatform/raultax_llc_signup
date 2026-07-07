@@ -151,7 +151,12 @@ export default function OnboardingPage() {
       localSteps.forEach((k, i) => {
         if (has[k]) furthest = i;
       });
-      if (furthest >= 0) setStep(Math.min(furthest + 1, localSteps.length - 1));
+      // The tax year is mandatory and comes first: until a declaration exists,
+      // always land on the year step (even if older data was saved before the
+      // per-year feature). Once declared, resume past the furthest saved step.
+      if (has.year && furthest >= 0) {
+        setStep(Math.min(furthest + 1, localSteps.length - 1));
+      }
       setLoadedPersonal(true);
     })();
     return () => {

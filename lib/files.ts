@@ -1,5 +1,6 @@
 import "server-only";
 import { isMultiple } from "./docTypes";
+import { allowedTaxYears } from "./taxYear";
 
 // Server-side client for the file Azure Functions (uploadFile / listFiles /
 // viewFile / deleteFile) on ksgpro-api. Same base/key as upsertUser. The app's
@@ -67,8 +68,8 @@ export async function uploadFile(
   jobId?: number | null,
   taxYear?: number | null,
 ): Promise<UserFile> {
-  // Stamp the current year at upload time (auto-detected, no selector).
-  const year = taxYear ?? new Date().getFullYear();
+  // Fallback stamp: the latest declarable tax year (in 2026 that's 2025).
+  const year = taxYear ?? allowedTaxYears()[0];
   const res = await fetch(
     fnUrl("uploadFile", {
       oid,

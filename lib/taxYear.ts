@@ -5,10 +5,13 @@
 
 export const TAX_YEAR_COOKIE = "rt_tax_year";
 
-// Sliding window: the current year + 3 back (2026 -> 2023–2026), matching the
-// IRS refund-claim window. Recomputed from the clock, so it advances itself.
+// Sliding window of declarable TAX years. You can only declare a COMPLETED
+// year: during 2026 you file the 2025 return — so the list is the last
+// finished year + 3 back (2026 -> 2025, 2024, 2023, 2022), matching the IRS
+// refund-claim window. Recomputed from the clock, so it advances every January.
 export function allowedTaxYears(now = new Date().getFullYear()): number[] {
-  return [now, now - 1, now - 2, now - 3];
+  const latest = now - 1;
+  return [latest, latest - 1, latest - 2, latest - 3];
 }
 
 // Clamp any raw value (cookie, request body) to the allowed window; default to
