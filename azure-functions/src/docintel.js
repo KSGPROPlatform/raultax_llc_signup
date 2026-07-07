@@ -125,6 +125,54 @@ function validateSsnCard(text) {
   return { ok, ssn, signals, strong };
 }
 
+// The cardholder's name is printed right after/below the number. OCR reading
+// order can merge it onto the same line as the SSN, so: scope to the text AFTER
+// the SSN match, blank out the card's own wording, then take the first run of
+// 2–5 name-like words.
+function extractSsnCardName(text) {
+  const t = (text || "").replace(/\r/g, "");
+  const m = t.match(/\d{3}[-\s]?\d{2}[-\s]?\d{4}/);
+  let scope = m ? t.slice(m.index + m[0].length) : t;
+  scope = scope
+    .replace(/social\s*security\s*administration/gi, "\n")
+    .replace(/social\s*security/gi, "\n")
+    .replace(/this\s+number\s+has\s+been\s+established\s+for/gi, "\n")
+    .replace(/valid\s+for\s+(work|employment)[^\n]*/gi, "\n")
+    .replace(/signature|account|number|card|department/gi, "\n");
+  const nm = scope.match(/[A-Z][A-Za-z'.\-]*(?:\s+[A-Z][A-Za-z'.\-]*){1,4}/);
+  return nm ? nm[0].trim().replace(/\s+/g, " ").slice(0, 60) : "";
+}
+
+// Format an SSN/TIN-looking value as XXX-XX-XXXX; keep the raw value otherwise.
+function fmtSsnLike(v) {
+  if (!v) return "";
+  const s = String(v);
+  return extractSsn(s) || s;
+}
+
+// Promote the key values into consistently-named top-level fields (ssn, names,
+// the form's own tax year) so consumers don't need model-specific nested paths.
+function promoteW2(flat) {
+  const emp = flat.Employee && typeof flat.Employee === "object" ? flat.Employee : {};
+  const er = flat.Employer && typeof flat.Employer === "object" ? flat.Employer : {};
+  return {
+    ssn: fmtSsnLike(emp.SocialSecurityNumber),
+    employee_name: emp.Name || "",
+    employer_name: er.Name || "",
+    tax_year: flat.TaxYear || "",
+  };
+}
+function promote1099(flat) {
+  const payer = flat.Payer && typeof flat.Payer === "object" ? flat.Payer : {};
+  const rec = flat.Recipient && typeof flat.Recipient === "object" ? flat.Recipient : {};
+  return {
+    company_name: payer.Name || flat.PayerName || "",
+    recipient_name: rec.Name || flat.RecipientName || "",
+    ssn: fmtSsnLike(rec.TIN || flat.RecipientTIN),
+    tax_year: flat.TaxYear || "",
+  };
+}
+
 const VARIANT_MODELS = ["NEC", "MISC", "DIV", "INT", "R", "G", "K"];
 function detect1099Variant(text) {
   const t = (text || "").toUpperCase().replace(/[\s.]+/g, "");
@@ -196,12 +244,15 @@ async function analyze1099(bytes) {
   const text = read.content || "";
   const variantModel = detect1099Variant(text);
   if (!variantModel) return { status: "mismatch", model: "prebuilt-read" };
-  return analyzeStructured(
+  const res = await analyzeStructured(
     variantModel,
     bytes,
     { variant: variantModel.replace("prebuilt-tax.us.1099", "") },
     RULE_1099,
   );
+  // Key values first: company (payer) name, recipient SSN, the form's year.
+  if (res.status === "done") res.flat = { ...promote1099(res.flat), ...res.flat };
+  return res;
 }
 
 // Main entry: run the right model for a doc_type. Returns { status, model?, flat?, rich? }.
@@ -218,18 +269,27 @@ async function analyzeForDocType(docType, bytes) {
     const content = r.content || "";
     const v = validateSsnCard(content);
     if (!v.ok) return { status: "mismatch", model: "prebuilt-read" };
+    const name = extractSsnCardName(content);
     return {
       status: "done",
       model: "prebuilt-read",
-      flat: { ssn: v.ssn, is_social_security_card: true, ...v.signals },
-      rich: { ssn: { value: v.ssn, confidence: null } },
+      flat: { ssn: v.ssn, name, is_social_security_card: true, ...v.signals },
+      rich: {
+        ssn: { value: v.ssn, confidence: null },
+        name: { value: name, confidence: null },
+      },
     };
   }
 
   // Structured models. W-2 gets its title rule; ID relies on the model's own
   // (already strong) document recognition.
   const rule = docType === "w2" ? W2_RULE : null;
-  return analyzeStructured(model, bytes, {}, rule);
+  const res = await analyzeStructured(model, bytes, {}, rule);
+  // W-2: key values first — employee SSN, employer name, the form's year.
+  if (res.status === "done" && docType === "w2") {
+    res.flat = { ...promoteW2(res.flat), ...res.flat };
+  }
+  return res;
 }
 
 module.exports = { analyzeForDocType, MODEL_FOR };
