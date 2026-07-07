@@ -22,11 +22,13 @@ function getKey(): Promise<Uint8Array> {
 }
 
 // What a QR upload is for: a specific document slot (and job), so the phone page
-// uploads to exactly the right place.
+// uploads to exactly the right place. taxYear carries the active declaration
+// year to the phone (it has no session cookie).
 export type UploadTarget = {
   docType?: string | null;
   jobId?: number | null;
   label?: string | null;
+  taxYear?: number | null;
 };
 
 export type UploadTokenPayload = {
@@ -34,6 +36,7 @@ export type UploadTokenPayload = {
   docType: string | null;
   jobId: number | null;
   label: string | null;
+  taxYear: number | null;
 };
 
 export async function createUploadToken(
@@ -47,6 +50,7 @@ export async function createUploadToken(
     docType: target?.docType ?? null,
     jobId: target?.jobId ?? null,
     label: target?.label ?? null,
+    taxYear: target?.taxYear ?? null,
   })
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .setIssuedAt()
@@ -67,6 +71,7 @@ export async function verifyUploadToken(
       docType: typeof payload.docType === "string" ? payload.docType : null,
       jobId: typeof payload.jobId === "number" ? payload.jobId : null,
       label: typeof payload.label === "string" ? payload.label : null,
+      taxYear: typeof payload.taxYear === "number" ? payload.taxYear : null,
     };
   } catch {
     // Expired, tampered, or signed with an old secret.

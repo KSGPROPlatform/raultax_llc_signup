@@ -1,20 +1,31 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getSession } from "@/lib/auth";
 import { listFiles, uploadFile, saveDocument, isFilesConfigured } from "@/lib/files";
-import { isKnownDocType } from "@/lib/docTypes";
+import { isKnownDocType, isYearScoped, isIdentityChecked } from "@/lib/docTypes";
+import { resolveExpectedIdentity } from "@/lib/identity";
+import { TAX_YEAR_COOKIE, resolveTaxYear } from "@/lib/taxYear";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB app-side cap
 
-// GET /api/files — the signed-in user's files.
+// GET /api/files — the signed-in user's files, scoped to the active tax year:
+// year-scoped docs (W-2/1099) only show for the selected declaration year;
+// identity docs (SSN card, ID) always show.
 export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const files = await listFiles(user.sub);
-  return NextResponse.json({ files });
+  const jar = await cookies();
+  const year = resolveTaxYear(jar.get(TAX_YEAR_COOKIE)?.value);
+  const all = await listFiles(user.sub);
+  const files = all.filter(
+    (f) => !isYearScoped(f.doc_type) || (f.tax_year ?? null) === year,
+  );
+  return NextResponse.json({ files, taxYear: year });
 }
 
 // POST /api/files — multipart "file" upload; forwarded to the function which
-// compresses (if large) and stores it in Blob.
+// compresses images (<1MB) and stores them in Blob, stamped with the active
+// declaration year. SSN-card slots require the typed name+SSN to exist first.
 export async function POST(request: Request) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,9 +53,32 @@ export async function POST(request: Request) {
     const docType = typeof docTypeRaw === "string" && isKnownDocType(docTypeRaw) ? docTypeRaw : null;
     const jobIdRaw = form.get("jobId");
     const jobId = typeof jobIdRaw === "string" && /^\d+$/.test(jobIdRaw) ? Number(jobIdRaw) : null;
+
+    // The active declaration year stamps every upload.
+    const jar = await cookies();
+    const taxYear = resolveTaxYear(jar.get(TAX_YEAR_COOKIE)?.value);
+
+    // Precondition for identity-checked docs (SSN cards): the name + SSN they'll
+    // be verified against must exist — the saved record wins, else the values
+    // typed in the form (sent along by DocUpload).
+    if (docType && isIdentityChecked(docType)) {
+      const expName = form.get("expectedName");
+      const expSsn = form.get("expectedSsn");
+      const expected = await resolveExpectedIdentity(user.sub, docType, {
+        name: typeof expName === "string" ? expName : null,
+        ssn: typeof expSsn === "string" ? expSsn : null,
+      });
+      if (!expected.ssn || !expected.name) {
+        return NextResponse.json(
+          { error: "Enter the name and Social Security number first — then upload the SSN card so we can verify it." },
+          { status: 400 },
+        );
+      }
+    }
+
     const saved = docType
-      ? await saveDocument(user.sub, file.name, contentType, bytes, docType, jobId)
-      : await uploadFile(user.sub, file.name, contentType, bytes);
+      ? await saveDocument(user.sub, file.name, contentType, bytes, docType, jobId, taxYear)
+      : await uploadFile(user.sub, file.name, contentType, bytes, null, null, taxYear);
     return NextResponse.json({ file: saved }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed.";

@@ -50,12 +50,13 @@ export async function POST(request: Request) {
       typeof docTypeRaw === "string" && isKnownDocType(docTypeRaw) ? docTypeRaw : null;
     const docType = auth.docType ?? formDocType;
     const jobId = auth.jobId ?? null;
+    const taxYear = auth.taxYear ?? null; // the declaration year baked into the QR
 
     const bytes = await file.arrayBuffer();
     const contentType = file.type || "application/octet-stream";
     const saved = docType
-      ? await saveDocument(auth.oid, file.name, contentType, bytes, docType, jobId)
-      : await uploadFile(auth.oid, file.name, contentType, bytes);
+      ? await saveDocument(auth.oid, file.name, contentType, bytes, docType, jobId, taxYear)
+      : await uploadFile(auth.oid, file.name, contentType, bytes, null, null, taxYear);
     return NextResponse.json({ file: saved }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed.";

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import QRCode from "qrcode";
 import { getSession } from "@/lib/auth";
 import { createUploadToken, UPLOAD_TOKEN_MAX_AGE } from "@/lib/uploadToken";
 import { isKnownDocType } from "@/lib/docTypes";
+import { TAX_YEAR_COOKIE, resolveTaxYear } from "@/lib/taxYear";
 
 // GET /api/uploads/handoff — (authenticated) mints a short-lived upload-only
 // token and returns a QR code the user scans to continue uploading on their
@@ -19,7 +21,11 @@ export async function GET(request: Request) {
   const jobIdRaw = params.get("jobId");
   const jobId = jobIdRaw && /^\d+$/.test(jobIdRaw) ? Number(jobIdRaw) : null;
   const label = (params.get("label") || "").slice(0, 80) || null;
-  const token = await createUploadToken(user.sub, { docType, jobId, label });
+  // Embed the active declaration year so the phone (no cookie) stamps uploads
+  // with the same year the desktop session is declaring.
+  const jar = await cookies();
+  const taxYear = resolveTaxYear(jar.get(TAX_YEAR_COOKIE)?.value);
+  const token = await createUploadToken(user.sub, { docType, jobId, label, taxYear });
 
   // Prefer the origin the BROWSER is actually on (sent by the client) — it is
   // the authoritative public URL. Behind Azure Static Web Apps the server-side

@@ -106,7 +106,21 @@ export function SpouseForm({
 
       {mode === "full" && (
         <>
-          <DocUpload docType="spouse_ssn_copy" label="Spouse SSN document" />
+          {/* Verified against the spouse's typed name + SSN; locked until valid. */}
+          <DocUpload
+            docType="spouse_ssn_copy"
+            label="Spouse SSN document"
+            expected={
+              v.first_name.trim() && v.last_name.trim() && !ssnErr
+                ? { name: `${v.first_name} ${v.last_name}`.trim(), ssn: v.ssn }
+                : null
+            }
+            disabledReason={
+              v.first_name.trim() && v.last_name.trim() && !ssnErr
+                ? null
+                : "Enter your spouse's name and Social Security number above first — we verify the card against them."
+            }
+          />
           <Field id="sp_street_address" label="Spouse street address" required maxLength={256} value={v.street_address} onChange={setText("street_address")} autoComplete="off" />
           <ComboField id="sp_state_province" label="State" required value={v.state_province} onChange={setVal("state_province")} options={STATE_NAMES} />
           <CityField id="sp_city" label="City" required value={v.city} onChange={setVal("city")} state={v.state_province} />

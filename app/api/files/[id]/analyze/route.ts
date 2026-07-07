@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { analyzeDocument, getExtraction } from "@/lib/files";
+import { isIdentityChecked } from "@/lib/docTypes";
+import { resolveExpectedIdentity } from "@/lib/identity";
 
 // POST /api/files/:id/analyze — run Document Intelligence over the file and store
-// the extracted fields. GET returns the stored extraction (for polling/display).
-// Both owner-scoped via the verified session oid.
+// the extracted fields. For identity-checked docs (SSN cards) the expected name +
+// SSN are resolved server-side (saved record wins, the form's typed values as
+// fallback) and passed to the function, which rejects mismatches. GET returns the
+// stored extraction (for polling/display). Both owner-scoped via the session oid.
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getSession();
@@ -16,7 +20,21 @@ export async function POST(
   if (!Number.isInteger(fileId)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
-  const extraction = await analyzeDocument(user.sub, fileId);
+
+  const body = (await request.json().catch(() => ({}))) as {
+    docType?: string;
+    expectedName?: string;
+    expectedSsn?: string;
+  };
+  let expected: { name?: string; ssn?: string } | undefined;
+  if (typeof body.docType === "string" && isIdentityChecked(body.docType)) {
+    expected = await resolveExpectedIdentity(user.sub, body.docType, {
+      name: body.expectedName ?? null,
+      ssn: body.expectedSsn ?? null,
+    });
+  }
+
+  const extraction = await analyzeDocument(user.sub, fileId, expected);
   return NextResponse.json({ extraction });
 }
 

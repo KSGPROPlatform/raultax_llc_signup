@@ -198,6 +198,20 @@ export const listJobs = (oid: string) => listRows<Job>("jobs", oid);
 export const saveJob = (oid: string, j: JobInput) => saveRow<Job>("jobs", oid, j);
 export const deleteJob = (oid: string, id: number) => deleteRow("jobs", oid, id);
 
+// ---- Declarations (one per user + tax year; the year is the filing's key) ----
+export type Declaration = {
+  id: number;
+  owner_oid: string;
+  tax_year: number;
+  status: string; // draft | submitted (future)
+  created_at: string;
+  updated_at: string;
+};
+export const listDeclarations = (oid: string) =>
+  listRows<Declaration>("declarations", oid);
+export const createDeclaration = (oid: string, taxYear: number) =>
+  saveRow<Declaration>("declarations", oid, { taxYear });
+
 // ---- Spouse (filing-status driven; one per user) ----
 export type Spouse = {
   id: number;

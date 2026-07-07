@@ -23,11 +23,12 @@ app.http("listFiles", {
       if (!oid) return { status: 400, jsonBody: { error: "oid is required" } };
 
       const pool = await getPool();
+      // SELECT * so per-app extra columns (e.g. raultax's tax_year) come back
+      // without breaking apps whose files table doesn't have them.
       const result = await pool
         .request()
         .input("oid", sql.NVarChar(64), oid).query(`
-          SELECT id, owner_oid, blob_name, original_name, content_type,
-                 size_bytes, stored_bytes, is_compressed, doc_type, job_id, uploaded_at
+          SELECT *
           FROM ${cfg.filesTable}
           WHERE owner_oid = @oid
           ORDER BY uploaded_at DESC;

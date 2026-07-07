@@ -12,6 +12,7 @@ import { RoleBadge } from "@/components/dashboard/RoleBadge";
 import { JobsSection } from "@/components/dashboard/JobsSection";
 import { DocUpload } from "@/components/documents/DocUpload";
 import { ProfileChecklist } from "@/components/dashboard/ProfileChecklist";
+import { YearPicker } from "@/components/dashboard/YearPicker";
 import { SpouseSection } from "@/components/dashboard/SpouseSection";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
@@ -50,13 +51,16 @@ export default async function UserDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Welcome back, {first}
-        </h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Manage your companies, filings, and documents in one place.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Welcome back, {first}
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Manage your companies, filings, and documents in one place.
+          </p>
+        </div>
+        <YearPicker />
       </header>
 
       <ProfileChecklist

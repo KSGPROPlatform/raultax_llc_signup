@@ -20,6 +20,7 @@ export type UserFile = {
   is_compressed: boolean;
   doc_type: string | null;
   job_id: number | null;
+  tax_year: number | null;
   uploaded_at: string;
 };
 
@@ -102,8 +103,9 @@ export async function saveDocument(
   bytes: ArrayBuffer,
   docType: string,
   jobId?: number | null,
+  taxYear?: number | null,
 ): Promise<UserFile> {
-  const saved = await uploadFile(oid, filename, contentType, bytes, docType, jobId);
+  const saved = await uploadFile(oid, filename, contentType, bytes, docType, jobId, taxYear);
   // Single-file slots replace the previous file: per-job docs (W-2/1099) are one
   // per job; non-job docs replace when the catalog marks them single (e.g. SSN).
   const single = jobId != null || (docType && !isMultiple(docType));
@@ -125,24 +127,42 @@ export type Extraction = {
   file_id: number;
   doc_type: string | null;
   model: string | null;
-  status: string; // pending | done | unsupported | error
+  status: string; // pending | done | unsupported | error | mismatch
+  // Present on a rejection ("mismatch"): why + the years involved.
+  reason?: string | null; // wrong_document | year_mismatch | year_unreadable | ssn_mismatch | name_mismatch | name_unreadable
+  doc_year?: number | null;
+  expected_year?: number | null;
+  deleted?: boolean;
   fields?: Record<string, unknown> | null; // from POST
   fields_json?: string | null; // from GET (stored)
   error?: string | null;
 };
 
+// What an identity-checked document (SSN card) must match — the account
+// holder's typed name + SSN, resolved server-side by the analyze route.
+export type ExpectedIdentity = { name?: string | null; ssn?: string | null };
+
 // Trigger extraction (blocks until the DI call completes — a few seconds).
 export async function analyzeDocument(
   oid: string,
   fileId: number,
+  expected?: ExpectedIdentity,
 ): Promise<Extraction | null> {
   if (!base) return null;
   try {
-    const res = await fetch(fnUrl("analyzeDocument", { oid, fileId }), {
-      method: "POST",
-      headers: APP_HEADERS,
-      signal: AbortSignal.timeout(90000),
-    });
+    const res = await fetch(
+      fnUrl("analyzeDocument", {
+        oid,
+        fileId,
+        expectedName: expected?.name || undefined,
+        expectedSsn: expected?.ssn || undefined,
+      }),
+      {
+        method: "POST",
+        headers: APP_HEADERS,
+        signal: AbortSignal.timeout(90000),
+      },
+    );
     if (!res.ok) return null;
     return (await res.json()) as Extraction;
   } catch (err) {

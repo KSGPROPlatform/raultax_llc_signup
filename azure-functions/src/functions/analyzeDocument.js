@@ -7,6 +7,46 @@ const { analyzeForDocType } = require("../docintel");
 // The stored file is already compressed small at upload (under the DI input-size
 // limit), so this function just reads it, extracts, and gates — no re-compression.
 
+// Docs whose printed tax year must match the declaration year they were uploaded
+// under, and docs cross-checked against the account holder's typed identity.
+const YEAR_DOCS = new Set(["w2", "form_1099"]);
+const IDENTITY_DOCS = new Set(["ssn_copy", "spouse_ssn_copy"]);
+
+const digits = (v) => String(v ?? "").replace(/\D/g, "");
+
+// The typed first AND last name must both appear as tokens in the card's name
+// (case-insensitive, any order — tolerates middle names/initials on the card).
+function nameMatches(expectedName, cardName) {
+  const cardTokens = new Set(
+    String(cardName).toLowerCase().split(/[^a-z]+/).filter(Boolean),
+  );
+  const expected = String(expectedName).toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  if (!expected.length || !cardTokens.size) return false;
+  return expected.every((t) => cardTokens.has(t));
+}
+
+// Gate a successful extraction. Returns null to accept, or a rejection
+// { reason, ...details } when the document must be refused.
+function gateResult(docType, flat, expected) {
+  if (YEAR_DOCS.has(docType)) {
+    const docYear = Number(digits(flat.tax_year).slice(0, 4)) || null;
+    if (!docYear) return { reason: "year_unreadable" };
+    if (docYear !== expected.taxYear) {
+      return { reason: "year_mismatch", doc_year: docYear, expected_year: expected.taxYear };
+    }
+  }
+  if (IDENTITY_DOCS.has(docType)) {
+    if (expected.ssn && digits(flat.ssn) !== digits(expected.ssn)) {
+      return { reason: "ssn_mismatch" };
+    }
+    if (expected.name) {
+      if (!String(flat.name ?? "").trim()) return { reason: "name_unreadable" };
+      if (!nameMatches(expected.name, flat.name)) return { reason: "name_mismatch" };
+    }
+  }
+  return null;
+}
+
 // /api/analyzeDocument — run Azure Document Intelligence over an uploaded file
 // and store the structured result in raul_tax_file_extractions (one per file).
 //   GET  ?oid=&fileId=   -> the stored extraction, or null
@@ -108,9 +148,9 @@ app.http("analyzeDocument", {
 
       const result = await analyzeForDocType(file.doc_type, bytes);
 
-      // Stage-1 rejection: the file isn't the document this slot expects. Per the
-      // product rule we DON'T store its data — we delete the upload entirely.
-      if (result.status === "mismatch") {
+      // Rejection path shared by every gate: per the product rule we DON'T keep a
+      // refused document or its data — the upload is deleted entirely.
+      const rejectFile = async (details) => {
         await deleteBlob(cfg.container, file.blob_name).catch(() => {});
         await pool
           .request()
@@ -124,14 +164,35 @@ app.http("analyzeDocument", {
           .catch(() => {});
         return {
           status: 200,
-          jsonBody: { file_id: fileId, status: "mismatch", model: result.model ?? null, deleted: true },
+          jsonBody: {
+            file_id: fileId,
+            status: "mismatch",
+            model: result.model ?? null,
+            deleted: true,
+            ...details,
+          },
         };
+      };
+
+      // Gate 1: the file isn't the document this slot expects at all.
+      if (result.status === "mismatch") {
+        return rejectFile({ reason: "wrong_document" });
       }
 
       // A doc type we don't extract (e.g. W-4) — keep the file, store nothing.
       if (result.status === "unsupported") {
         return { status: 200, jsonBody: { file_id: fileId, doc_type: file.doc_type, status: "unsupported" } };
       }
+
+      // Gates 2+3: the document read fine — now it must BELONG here. W-2/1099
+      // must carry the declaration's tax year; SSN cards must match the typed
+      // identity (expected values passed server-to-server by the app).
+      const rejection = gateResult(file.doc_type, result.flat || {}, {
+        taxYear,
+        ssn: request.query.get("expectedSsn") || "",
+        name: request.query.get("expectedName") || "",
+      });
+      if (rejection) return rejectFile(rejection);
 
       await upsertExtraction(pool, {
         fileId,

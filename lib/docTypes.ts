@@ -59,3 +59,19 @@ const EXTRACTABLE = new Set([
 export function isExtractable(key: string | null | undefined): boolean {
   return key ? EXTRACTABLE.has(key) : false;
 }
+
+// Docs that belong to a specific tax year (the form itself is printed with a
+// year, which must match the declaration being worked on). Identity documents
+// (SSN card, ID) are NOT year-scoped — they're uploaded once.
+const YEAR_SCOPED = new Set(["w2", "form_1099"]);
+
+export function isYearScoped(key: string | null | undefined): boolean {
+  return key ? YEAR_SCOPED.has(key) : false;
+}
+
+// Docs cross-checked against the account identity (typed name + SSN).
+const IDENTITY_CHECKED = new Set(["ssn_copy", "spouse_ssn_copy"]);
+
+export function isIdentityChecked(key: string | null | undefined): boolean {
+  return key ? IDENTITY_CHECKED.has(key) : false;
+}

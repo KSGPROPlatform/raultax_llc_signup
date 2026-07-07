@@ -9,6 +9,8 @@ import {
   type PersonalInfoValues,
 } from "@/components/profile/PersonalInfoForm";
 import { SpouseSection } from "@/components/dashboard/SpouseSection";
+import { SelectField } from "@/components/forms/Field";
+import { allowedTaxYears } from "@/lib/taxYear";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
@@ -16,6 +18,7 @@ import { JobsSection } from "@/components/dashboard/JobsSection";
 import { postJson } from "@/lib/api";
 
 type StepKey =
+  | "year"
   | "personal"
   | "spouse"
   | "dependents"
@@ -25,6 +28,10 @@ type StepKey =
   | "finish";
 
 const META: Record<StepKey, { title: string; subtitle: string }> = {
+  year: {
+    title: "Tax year",
+    subtitle: "Which year are you declaring taxes for?",
+  },
   personal: {
     title: "Personal info",
     subtitle: "Tell us about yourself so we can prepare your return.",
@@ -52,7 +59,9 @@ const META: Record<StepKey, { title: string; subtitle: string }> = {
   },
 };
 
-// The journey branches on the Form-1 filing status:
+// The journey starts by picking the TAX YEAR being declared (the filing's
+// primary attribute — all documents are stamped with it), then branches on the
+// Form-1 filing status:
 //   Single                    -> no spouse, no dependents
 //   Married filing jointly    -> full spouse step + dependents
 //   Married filing separately -> spouse SSN-only step + dependents
@@ -63,6 +72,7 @@ function buildSteps(filingStatus: string): StepKey[] {
     filingStatus === "Married filing separately";
   const needsDependents = filingStatus !== "Single";
   return [
+    "year",
     "personal",
     ...(needsSpouse ? (["spouse"] as StepKey[]) : []),
     ...(needsDependents ? (["dependents"] as StepKey[]) : []),
@@ -82,6 +92,8 @@ export default function OnboardingPage() {
   const [personal, setPersonal] = useState<Partial<PersonalInfoValues>>({});
   const [savingPersonal, setSavingPersonal] = useState(false);
   const [loadedPersonal, setLoadedPersonal] = useState(false);
+  const [taxYear, setTaxYear] = useState<number>(allowedTaxYears()[0]);
+  const [savingYear, setSavingYear] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fs = personal.filing_status ?? "";
@@ -107,7 +119,8 @@ export default function OnboardingPage() {
           .then((r) => (r.ok ? r.json() : {}))
           .catch(() => ({}));
       const len = (v: unknown) => (Array.isArray(v) ? v.length : 0);
-      const [pf, sp, dep, bank, jobs, co] = await Promise.all([
+      const [decl, pf, sp, dep, bank, jobs, co] = await Promise.all([
+        get("/api/declarations"),
         get("/api/profile/personal"),
         get("/api/spouse"),
         get("/api/dependents"),
@@ -116,11 +129,13 @@ export default function OnboardingPage() {
         get("/api/companies"),
       ]);
       if (!active) return;
+      if (typeof decl.selectedYear === "number") setTaxYear(decl.selectedYear);
       const profile = (pf.profile ?? {}) as Partial<PersonalInfoValues>;
       if (pf.profile) setPersonal(profile);
       const localSteps = buildSteps(profile.filing_status ?? "");
       const spouse = (sp.spouse ?? null) as Record<string, string> | null;
       const has: Record<StepKey, boolean> = {
+        year: len(decl.rows) > 0,
         personal: Boolean((profile.date_of_birth ?? "").trim()),
         spouse: Boolean(
           spouse &&
@@ -155,6 +170,30 @@ export default function OnboardingPage() {
     setPersonal(values);
     const newLast = buildSteps(values.filing_status ?? "").length - 1;
     setStep((s) => Math.min(newLast, s + 1));
+  }
+
+  // Step 0 Continue: start (or re-open) the chosen year's declaration — every
+  // document uploaded afterwards is stamped with it — then advance.
+  async function saveYear() {
+    setError(null);
+    setSavingYear(true);
+    try {
+      const res = await fetch("/api/declarations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taxYear }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || "Could not start the declaration.");
+        return;
+      }
+      setStep((s) => Math.min(last, s + 1));
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setSavingYear(false);
+    }
   }
 
   async function finish() {
@@ -222,6 +261,23 @@ export default function OnboardingPage() {
           </p>
 
           <div className="mt-6">
+            {currentKey === "year" && (
+              <div className="space-y-4">
+                <FormError message={error} />
+                <SelectField
+                  id="ob_tax_year"
+                  label="Tax year"
+                  required
+                  value={String(taxYear)}
+                  onChange={(e) => setTaxYear(Number(e.target.value))}
+                  options={allowedTaxYears().map(String)}
+                />
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Your documents (W-2s, 1099s) must be for this year — you can
+                  declare another year later from your dashboard.
+                </p>
+              </div>
+            )}
             {currentKey === "personal" &&
               (loadedPersonal ? (
                 <>
@@ -261,20 +317,35 @@ export default function OnboardingPage() {
               "Continue", so the generic footer renders for every other step. */}
           {currentKey !== "personal" && (
             <div className="mt-8 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setStep((s) => Math.max(0, s - 1))}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-              >
-                <ArrowLeft className="h-4 w-4" /> Back
-              </button>
+              {safeStep > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStep((s) => Math.max(0, s - 1))}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </button>
+              )}
               {safeStep < last ? (
                 <button
                   type="button"
-                  onClick={() => setStep((s) => Math.min(last, s + 1))}
+                  disabled={savingYear}
+                  onClick={() =>
+                    currentKey === "year"
+                      ? saveYear()
+                      : setStep((s) => Math.min(last, s + 1))
+                  }
                   className={`${buttonClass} flex flex-1 items-center justify-center gap-1.5`}
                 >
-                  Continue <ArrowRight className="h-4 w-4" />
+                  {savingYear ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Starting…
+                    </>
+                  ) : (
+                    <>
+                      Continue <ArrowRight className="h-4 w-4" />
+                    </>
+                  )}
                 </button>
               ) : (
                 <button

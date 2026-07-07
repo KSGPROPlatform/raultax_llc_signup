@@ -43,20 +43,47 @@ function renderVal(v: unknown): string {
   return String(v);
 }
 
+// Human message for a rejected document, by the reject reason from the gates.
+function rejectMessage(
+  label: string,
+  ex: { reason?: string | null; doc_year?: number | null; expected_year?: number | null },
+): string {
+  switch (ex.reason) {
+    case "year_mismatch":
+      return `This ${label} is for ${ex.doc_year}, but you're declaring ${ex.expected_year} — please upload the ${ex.expected_year} form.`;
+    case "year_unreadable":
+      return `We couldn't read the year on this ${label} — it may be too blurry. Please upload a clearer copy.`;
+    case "ssn_mismatch":
+      return "The SSN on this card doesn't match the SSN you entered.";
+    case "name_mismatch":
+      return "The name on this card doesn't match the name on the account.";
+    case "name_unreadable":
+      return "We couldn't read the name on this card — please upload a clearer copy.";
+    default:
+      return `This doesn't look like ${label}. Please upload the correct document.`;
+  }
+}
+
 // One inline document slot: shows the current file (view/download/remove) or an
 // uploader, plus a "Use phone" button that shows a QR so the exact document can
 // be captured on a phone. After a file lands, high-value docs (W-2, 1099, ID,
 // SSN) are read by Azure Document Intelligence and the fields are saved.
+// `expected` (SSN cards) carries the typed name+SSN the card must match;
+// `disabledReason` blocks the slot until that info exists.
 export function DocUpload({
   docType,
   jobId,
   label,
   accept = DOC_ACCEPT,
+  expected,
+  disabledReason,
 }: {
   docType: string;
   jobId?: number;
   label: string;
   accept?: string;
+  expected?: { name: string; ssn: string } | null;
+  disabledReason?: string | null;
 }) {
   const [file, setFile] = useState<UserFile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,13 +135,22 @@ export function DocUpload({
     async (fileId: number) => {
       setAnalyze("reading");
       try {
-        const res = await fetch(`/api/files/${fileId}/analyze`, { method: "POST" });
+        const res = await fetch(`/api/files/${fileId}/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            docType,
+            expectedName: expected?.name || undefined,
+            expectedSsn: expected?.ssn || undefined,
+          }),
+        });
         const d = await res.json().catch(() => ({}));
-        const ex = d.extraction as (Extraction & { deleted?: boolean }) | null;
+        const ex = d.extraction as Extraction | null;
         if (res.ok && ex) {
           if (ex.status === "mismatch") {
-            // The wrong document was rejected & deleted server-side.
-            setWarning(`This doesn't look like ${label}. Please upload the correct document.`);
+            // The document was rejected & deleted server-side (wrong document,
+            // wrong/unreadable year, or identity mismatch).
+            setWarning(rejectMessage(label, ex));
             setFile(null);
             setFields(null);
             setAnalyze("idle");
@@ -129,7 +165,7 @@ export function DocUpload({
         setAnalyze("error");
       }
     },
-    [label],
+    [label, docType, expected?.name, expected?.ssn],
   );
 
   // When a file lands (upload, replace, or phone upload) show the stored
@@ -173,6 +209,10 @@ export function DocUpload({
       fd.set("file", list[0]);
       fd.set("docType", docType);
       if (jobId != null) fd.set("jobId", String(jobId));
+      // Typed name+SSN travel with the upload so the server can verify the card
+      // even before the form has been saved.
+      if (expected?.name) fd.set("expectedName", expected.name);
+      if (expected?.ssn) fd.set("expectedSsn", expected.ssn);
       const res = await fetch("/api/files", { method: "POST", body: fd });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -256,7 +296,14 @@ export function DocUpload({
 
       {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
 
-      {/* Wrong-document rejection: the file was deleted; ask for the correct one. */}
+      {/* Slot locked until the info the document must match has been entered. */}
+      {disabledReason && !file && (
+        <p className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+          {disabledReason}
+        </p>
+      )}
+
+      {/* Rejection: the file was deleted; ask for the correct one. */}
       {warning && (
         <p className="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-400">
           {warning}
@@ -314,7 +361,7 @@ export function DocUpload({
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || Boolean(disabledReason)}
           onClick={() => inputRef.current?.click()}
           className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
         >
@@ -323,7 +370,7 @@ export function DocUpload({
         </button>
         <button
           type="button"
-          disabled={qrLoading}
+          disabled={qrLoading || Boolean(disabledReason)}
           onClick={() => (qr ? setQr(null) : openPhone())}
           className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
         >

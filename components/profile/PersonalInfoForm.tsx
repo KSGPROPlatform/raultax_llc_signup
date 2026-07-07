@@ -190,7 +190,22 @@ export function PersonalInfoForm({
         onChange={setValue("ssn")}
         onBlur={touch("ssn")}
       />
-      <DocUpload docType="ssn_copy" label="SSN document" />
+      {/* The SSN card is verified against the typed name + SSN, so the slot
+          unlocks only once those are valid. */}
+      <DocUpload
+        docType="ssn_copy"
+        label="SSN document"
+        expected={
+          !errs.first_name && !errs.last_name && !errs.ssn
+            ? { name: `${v.first_name} ${v.last_name}`.trim(), ssn: v.ssn }
+            : null
+        }
+        disabledReason={
+          !errs.first_name && !errs.last_name && !errs.ssn
+            ? null
+            : "Enter your name and Social Security number above first — we verify the card against them."
+        }
+      />
       <Field
         id="pi_street_address"
         label="Street address"
