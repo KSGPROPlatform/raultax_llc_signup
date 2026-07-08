@@ -12,7 +12,7 @@ export default async function DashboardLayout({
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
-  // Onboarding is optional and invited from the dashboard (see ProfileChecklist),
+  // Onboarding is optional and invited from the dashboard (see DeclarationsCard),
   // so we no longer force unfinished users into /onboarding here.
 
   return (
