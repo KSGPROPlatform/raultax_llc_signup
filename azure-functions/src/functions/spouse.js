@@ -24,7 +24,7 @@ app.http("spouse", {
       if (request.method === "GET") {
         const oid = request.query.get("oid");
         if (!oid) return { status: 400, jsonBody: { error: "oid is required" } };
-        const taxYear = Number(request.query.get("taxYear"));
+        const taxYear = request.query.get("taxYear") ? Number(request.query.get("taxYear")) : NaN;
         const req = pool.request().input("oid", sql.NVarChar(64), oid);
         let where = "owner_oid = @oid";
         if (Number.isInteger(taxYear)) {
@@ -88,7 +88,7 @@ app.http("spouse", {
       if (request.method === "DELETE") {
         const oid = request.query.get("oid");
         if (!oid) return { status: 400, jsonBody: { error: "oid is required" } };
-        const taxYear = Number(request.query.get("taxYear"));
+        const taxYear = request.query.get("taxYear") ? Number(request.query.get("taxYear")) : NaN;
         const req = pool.request().input("oid", sql.NVarChar(64), oid);
         let where = "owner_oid = @oid";
         if (Number.isInteger(taxYear)) {
