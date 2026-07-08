@@ -97,7 +97,8 @@ function OnboardingFlow() {
   // Nothing renders until the saved year + resume position have loaded, so the
   // stepper never flashes the default year / first step before jumping.
   const [loaded, setLoaded] = useState(false);
-  const [taxYear, setTaxYear] = useState<number>(allowedTaxYears()[0]);
+  // No default — the user must actively pick a year before Continue enables.
+  const [taxYear, setTaxYear] = useState<number | null>(null);
   const [savingYear, setSavingYear] = useState(false);
   const [startedYears, setStartedYears] = useState<number[]>([]);
   const [hasData, setHasData] = useState<Partial<Record<StepKey, boolean>> | null>(null);
@@ -139,11 +140,10 @@ function OnboardingFlow() {
       const started = (Array.isArray(decl.rows) ? (decl.rows as { tax_year: number }[]) : [])
         .map((r) => r.tax_year);
       setStartedYears(started);
-      if (isNew) {
-        // Declaring a NEW year: preselect the first year not started yet.
-        const fresh = allowedTaxYears().find((y) => !started.includes(y));
-        if (fresh) setTaxYear(fresh);
-      } else if (typeof decl.selectedYear === "number") {
+      // The select stays on "Select…" until the user picks — EXCEPT when
+      // re-entering an already-started declaration (Back from a later step
+      // should show the year being worked on, not force a re-pick).
+      if (!isNew && started.length > 0 && typeof decl.selectedYear === "number") {
         setTaxYear(decl.selectedYear);
       }
       const profile = (pf.profile ?? {}) as Partial<PersonalInfoValues>;
@@ -211,6 +211,7 @@ function OnboardingFlow() {
   // Step 0 Continue: start (or re-open) the chosen year's declaration — every
   // document uploaded afterwards is stamped with it — then advance.
   async function saveYear() {
+    if (taxYear === null) return; // Continue is disabled until a year is picked
     setError(null);
     setSavingYear(true);
     try {
@@ -310,8 +311,10 @@ function OnboardingFlow() {
                   id="ob_tax_year"
                   label="Tax year"
                   required
-                  value={String(taxYear)}
-                  onChange={(e) => setTaxYear(Number(e.target.value))}
+                  value={taxYear === null ? "" : String(taxYear)}
+                  onChange={(e) =>
+                    setTaxYear(e.target.value ? Number(e.target.value) : null)
+                  }
                   options={allowedTaxYears().map(String)}
                   disabledOptions={startedYears
                     .filter((y) => y !== taxYear)
@@ -383,7 +386,7 @@ function OnboardingFlow() {
               {safeStep < last ? (
                 <button
                   type="button"
-                  disabled={savingYear}
+                  disabled={savingYear || (currentKey === "year" && taxYear === null)}
                   onClick={() =>
                     currentKey === "year"
                       ? saveYear()
