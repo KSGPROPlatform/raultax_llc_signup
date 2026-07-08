@@ -1,15 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  FileText,
-  Plus,
-  ArrowRight,
-  CheckCircle2,
-  ChevronDown,
-  Loader2,
-} from "lucide-react";
+import { FileText, Plus, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import type { Declaration } from "@/lib/profileData";
 import { allowedTaxYears } from "@/lib/taxYear";
 
@@ -20,8 +13,9 @@ type Counts = { bank: number; companies: number; jobs: number; personalDone: boo
 //   - No declarations yet -> a single "Declare your tax" call-to-action (no
 //     progress bar) that opens onboarding at the year-selection step.
 //   - Otherwise -> one row per started year with its progress and a Continue
-//     button (the active year highlighted), plus a "Declare tax" menu offering
-//     only the years NOT started yet (hidden once all are started).
+//     button (the active year highlighted), plus a "Declare tax" button that
+//     opens the year-selection form (started years disabled there); the button
+//     hides once every available year is started.
 export function DeclarationsCard({
   onboardingComplete,
 }: {
@@ -31,10 +25,8 @@ export function DeclarationsCard({
   const [decls, setDecls] = useState<Declaration[] | null>(null);
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [counts, setCounts] = useState<Counts | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [busyYear, setBusyYear] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -66,16 +58,6 @@ export function DeclarationsCard({
       active = false;
     };
   }, []);
-
-  // Close the year menu on outside click.
-  useEffect(() => {
-    if (!menuOpen) return;
-    function onDoc(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [menuOpen]);
 
   if (!decls || !counts) return null;
 
@@ -155,35 +137,18 @@ export function DeclarationsCard({
           My tax declarations
         </h2>
         {remaining.length > 0 && (
-          <div ref={menuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((o) => !o)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400"
-            >
-              <Plus className="h-4 w-4" /> Declare tax
-              <ChevronDown className={`h-4 w-4 transition-transform ${menuOpen ? "rotate-180" : ""}`} />
-            </button>
-            {menuOpen && (
-              <ul className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 text-sm shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-                {remaining.map((y) => (
-                  <li key={y}>
-                    <button
-                      type="button"
-                      disabled={busyYear !== null}
-                      onClick={() => {
-                        setMenuOpen(false);
-                        go(y);
-                      }}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-zinc-700 hover:bg-zinc-100 disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                    >
-                      <FileText className="h-4 w-4 text-zinc-400" /> Tax year {y}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              // Opens the year-selection form; already-started years render
+              // disabled there.
+              router.push("/onboarding?new=1");
+              router.refresh();
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400"
+          >
+            <Plus className="h-4 w-4" /> Declare tax
+          </button>
         )}
       </div>
 

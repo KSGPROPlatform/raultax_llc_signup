@@ -45,6 +45,7 @@ export function SelectField({
   value,
   onChange,
   required,
+  disabledOptions,
 }: {
   id: string;
   label: string;
@@ -52,6 +53,8 @@ export function SelectField({
   value: string;
   onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   required?: boolean;
+  // Options shown but not selectable (e.g. tax years already started).
+  disabledOptions?: string[];
 }) {
   return (
     <div className="space-y-1.5">
@@ -67,11 +70,15 @@ export function SelectField({
         className={`${fieldClass} cursor-pointer`}
       >
         <option value="">Select…</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
+        {options.map((o) => {
+          const off = disabledOptions?.includes(o) ?? false;
+          return (
+            <option key={o} value={o} disabled={off}>
+              {o}
+              {off ? " — already started" : ""}
+            </option>
+          );
+        })}
       </select>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { buttonClass, FormError } from "@/components/auth/AuthShell";
 import {
@@ -85,8 +85,11 @@ function buildSteps(filingStatus: string): StepKey[] {
 const spouseModeFor = (fs: string): "full" | "ssn" =>
   fs === "Married filing jointly" ? "full" : "ssn";
 
-export default function OnboardingPage() {
+function OnboardingFlow() {
   const router = useRouter();
+  // "?new=1" = the dashboard's "Declare tax" button: always open on the
+  // year-selection step, with already-started years disabled.
+  const isNew = useSearchParams().get("new") === "1";
   const [step, setStep] = useState(0);
   const [finishing, setFinishing] = useState(false);
   const [personal, setPersonal] = useState<Partial<PersonalInfoValues>>({});
@@ -96,6 +99,8 @@ export default function OnboardingPage() {
   const [loaded, setLoaded] = useState(false);
   const [taxYear, setTaxYear] = useState<number>(allowedTaxYears()[0]);
   const [savingYear, setSavingYear] = useState(false);
+  const [startedYears, setStartedYears] = useState<number[]>([]);
+  const [hasData, setHasData] = useState<Partial<Record<StepKey, boolean>> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const fs = personal.filing_status ?? "";
@@ -131,7 +136,16 @@ export default function OnboardingPage() {
         get("/api/companies"),
       ]);
       if (!active) return;
-      if (typeof decl.selectedYear === "number") setTaxYear(decl.selectedYear);
+      const started = (Array.isArray(decl.rows) ? (decl.rows as { tax_year: number }[]) : [])
+        .map((r) => r.tax_year);
+      setStartedYears(started);
+      if (isNew) {
+        // Declaring a NEW year: preselect the first year not started yet.
+        const fresh = allowedTaxYears().find((y) => !started.includes(y));
+        if (fresh) setTaxYear(fresh);
+      } else if (typeof decl.selectedYear === "number") {
+        setTaxYear(decl.selectedYear);
+      }
       const profile = (pf.profile ?? {}) as Partial<PersonalInfoValues>;
       if (pf.profile) setPersonal(profile);
       const localSteps = buildSteps(profile.filing_status ?? "");
@@ -149,14 +163,17 @@ export default function OnboardingPage() {
         business: len(co.rows) > 0,
         finish: false,
       };
+      setHasData(has);
       let furthest = -1;
       localSteps.forEach((k, i) => {
         if (has[k]) furthest = i;
       });
       // The tax year is mandatory and comes first: until a declaration exists,
       // always land on the year step (even if older data was saved before the
-      // per-year feature). Once declared, resume past the furthest saved step.
-      if (has.year && furthest >= 0) {
+      // per-year feature). Once declared, resume past the furthest saved step —
+      // EXCEPT when declaring a new year (?new=1), which always starts at the
+      // year step.
+      if (!isNew && has.year && furthest >= 0) {
         setStep(Math.min(furthest + 1, localSteps.length - 1));
       }
       setLoaded(true);
@@ -175,8 +192,20 @@ export default function OnboardingPage() {
     setSavingPersonal(false);
     if (!ok) return setError(error);
     setPersonal(values);
-    const newLast = buildSteps(values.filing_status ?? "").length - 1;
-    setStep((s) => Math.min(newLast, s + 1));
+    const localSteps = buildSteps(values.filing_status ?? "");
+    // Declaring a new year with everything pre-filled: after confirming the
+    // personal info, jump straight to where the user's progress had reached
+    // instead of stepping through every already-completed form.
+    if (isNew && hasData) {
+      const snapshot = { ...hasData, year: true, personal: true };
+      let furthest = -1;
+      localSteps.forEach((k, i) => {
+        if (snapshot[k]) furthest = i;
+      });
+      setStep(Math.min(furthest + 1, localSteps.length - 1));
+      return;
+    }
+    setStep((s) => Math.min(localSteps.length - 1, s + 1));
   }
 
   // Step 0 Continue: start (or re-open) the chosen year's declaration — every
@@ -284,6 +313,9 @@ export default function OnboardingPage() {
                   value={String(taxYear)}
                   onChange={(e) => setTaxYear(Number(e.target.value))}
                   options={allowedTaxYears().map(String)}
+                  disabledOptions={startedYears
+                    .filter((y) => y !== taxYear)
+                    .map(String)}
                 />
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">
                   Your documents (W-2s, 1099s) must be for this year — you can
@@ -394,5 +426,14 @@ export default function OnboardingPage() {
         )}
       </div>
     </main>
+  );
+}
+
+// useSearchParams requires a Suspense boundary at the page level.
+export default function OnboardingPage() {
+  return (
+    <Suspense>
+      <OnboardingFlow />
+    </Suspense>
   );
 }
