@@ -3,14 +3,24 @@ import { getSession } from "@/lib/auth";
 import { upsertUser, type Profile } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 import type { PersonalInfoValues } from "@/components/profile/PersonalInfoForm";
-import { getUserProfile } from "@/lib/profileData";
+import { getUserProfile, listDeclarations, createDeclaration } from "@/lib/profileData";
+import { activeTaxYear } from "@/lib/activeYear";
 
-// GET /api/profile/personal — the user's saved personal info (first/last from
-// sign-up + anything from a prior visit), used to pre-fill the onboarding step.
+// GET /api/profile/personal — the user's saved personal info for the ACTIVE
+// declaration year. Identity (name, DOB, SSN, phone) comes from the profile;
+// the year-changing 1040 facts (filing status, marital status, address) come
+// from the active year's declaration, falling back to the profile values.
 export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const p = await getUserProfile(user.sub);
+  const year = await activeTaxYear();
+  const [p, decls] = await Promise.all([
+    getUserProfile(user.sub),
+    listDeclarations(user.sub),
+  ]);
+  const d = decls.find((r) => r.tax_year === year);
+  const perYear = (dv?: string | null, uv?: string | null) =>
+    dv && dv.trim() ? dv : (uv ?? "");
   // Fallback: if the granular first/last name aren't stored (e.g. the account was
   // created before they were captured, or a signup upsert failed), derive them
   // from the session display name so Form 1 still pre-fills. First token = first
@@ -23,16 +33,16 @@ export async function GET() {
     middle_name: p?.middle_name ?? "",
     last_name: p?.last_name || fbLast,
     date_of_birth: p?.date_of_birth ?? "",
-    marital_status: p?.marital_status ?? "",
-    filing_status: p?.filing_status ?? "",
+    marital_status: perYear(d?.marital_status, p?.marital_status),
+    filing_status: perYear(d?.filing_status, p?.filing_status),
     phone_number: p?.phone_number ?? "",
     ssn: p?.ssn ?? "",
-    street_address: p?.street_address ?? "",
-    city: p?.city ?? "",
-    state_province: p?.state_province ?? "",
-    postal_code: p?.postal_code ?? "",
+    street_address: perYear(d?.street_address, p?.street_address),
+    city: perYear(d?.city, p?.city),
+    state_province: perYear(d?.state_province, p?.state_province),
+    postal_code: perYear(d?.postal_code, p?.postal_code),
   };
-  return NextResponse.json({ profile });
+  return NextResponse.json({ profile, taxYear: year });
 }
 
 // POST /api/profile/personal — saves the Personal info (the first onboarding
@@ -62,6 +72,22 @@ export async function POST(request: Request) {
   const name = [v.first_name, v.middle_name, v.last_name].filter(Boolean).join(" ");
 
   const { role, ownsEstablishment } = await upsertUser({ ...user, name }, profile);
+
+  // The year-changing 1040 facts also land on the ACTIVE year's declaration —
+  // this is their source of truth (the profile copy is a fallback for
+  // pre-declaration accounts).
+  try {
+    await createDeclaration(user.sub, await activeTaxYear(), {
+      filing_status: v.filing_status,
+      marital_status: v.marital_status,
+      street_address: v.street_address,
+      city: v.city,
+      state_province: v.state_province,
+      postal_code: v.postal_code,
+    });
+  } catch (err) {
+    console.error("declaration personal save failed:", err);
+  }
   // Keep the user's current onboardingComplete — completing Personal info alone
   // does not finish the journey.
   const updated = {

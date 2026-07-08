@@ -16,7 +16,8 @@ import { SpouseSection } from "@/components/dashboard/SpouseSection";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
-import { getUserProfile } from "@/lib/profileData";
+import { getUserProfile, listDeclarations } from "@/lib/profileData";
+import { activeTaxYear } from "@/lib/activeYear";
 
 const QUICK_ACTIONS = [
   { label: "Start a new filing", desc: "Form a new LLC", icon: Plus },
@@ -39,8 +40,16 @@ export default async function UserDashboardPage() {
   //  Married filing jointly    -> full spouse + dependents
   //  Married filing separately -> spouse SSN only + dependents
   //  Head of household         -> dependents (no spouse)
-  const profile = await getUserProfile(user.sub);
-  const filingStatus = profile?.filing_status ?? "";
+  // It is PER YEAR: the active declaration's value wins; the profile copy is a
+  // fallback for pre-declaration accounts.
+  const year = await activeTaxYear();
+  const [profile, decls] = await Promise.all([
+    getUserProfile(user.sub),
+    listDeclarations(user.sub),
+  ]);
+  const active = decls.find((d) => d.tax_year === year);
+  const filingStatus =
+    (active?.filing_status ?? "").trim() || (profile?.filing_status ?? "");
   const showSpouse =
     filingStatus === "Married filing jointly" ||
     filingStatus === "Married filing separately";

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { FileText, Plus, ArrowRight, CheckCircle2, Loader2, Send } from "lucide-react";
 import type { Declaration } from "@/lib/profileData";
 import { allowedTaxYears } from "@/lib/taxYear";
 
@@ -61,6 +61,32 @@ export function DeclarationsCard() {
 
   const started = new Set(decls.map((r) => r.tax_year));
   const remaining = allowedTaxYears().filter((y) => !started.has(y));
+
+  // Mark a finished year's declaration as submitted.
+  async function submitYear(year: number) {
+    if (!confirm(`Submit your ${year} tax declaration? You can still view it afterwards.`)) return;
+    setBusyYear(year);
+    setError(null);
+    try {
+      const res = await fetch("/api/declarations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taxYear: year, status: "submitted" }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || "Could not submit the declaration.");
+        return;
+      }
+      setDecls((prev) =>
+        (prev ?? []).map((r) => (r.tax_year === year ? { ...r, status: "submitted" } : r)),
+      );
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setBusyYear(null);
+    }
+  }
 
   // Make the chosen year active, then enter its journey.
   async function go(year: number) {
@@ -145,6 +171,7 @@ export function DeclarationsCard() {
           const isActive = r.tax_year === activeYear;
           const pct = rowPct(r);
           const complete = pct === 100;
+          const submitted = r.status === "submitted";
           return (
             <li
               key={r.id}
@@ -176,25 +203,37 @@ export function DeclarationsCard() {
                   <span className="text-xs tabular-nums text-zinc-500 dark:text-zinc-400">{pct}%</span>
                 </div>
               </div>
-              {complete ? (
-                <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" /> Complete
+              {submitted ? (
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                  <CheckCircle2 className="h-4 w-4" /> Submitted
                 </span>
               ) : (
-                <button
-                  type="button"
-                  disabled={busyYear !== null}
-                  onClick={() => go(r.tax_year)}
-                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-zinc-300 px-3.5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-                >
-                  {busyYear === r.tax_year ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      Continue <ArrowRight className="h-4 w-4" />
-                    </>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busyYear !== null}
+                    onClick={() => go(r.tax_year)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3.5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                  >
+                    {busyYear === r.tax_year ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        Continue <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                  {complete && (
+                    <button
+                      type="button"
+                      disabled={busyYear !== null}
+                      onClick={() => submitYear(r.tax_year)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400 disabled:opacity-50"
+                    >
+                      <Send className="h-4 w-4" /> Submit
+                    </button>
                   )}
-                </button>
+                </div>
               )}
             </li>
           );

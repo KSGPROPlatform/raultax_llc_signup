@@ -209,7 +209,14 @@ export type Declaration = {
   id: number;
   owner_oid: string;
   tax_year: number;
-  status: string; // draft | submitted (future)
+  status: string; // draft | submitted
+  // 1040 facts that can change between years (live on the declaration).
+  filing_status?: string;
+  marital_status?: string;
+  street_address?: string;
+  city?: string;
+  state_province?: string;
+  postal_code?: string;
   created_at: string;
   updated_at: string;
   // Per-year section counts (from the declarations function's GET).
@@ -218,10 +225,26 @@ export type Declaration = {
   companies?: number;
   dependents?: number;
 };
+// Per-year fields accepted by the upsert (absent fields are kept server-side).
+export type DeclarationInput = Partial<
+  Pick<
+    Declaration,
+    | "status"
+    | "filing_status"
+    | "marital_status"
+    | "street_address"
+    | "city"
+    | "state_province"
+    | "postal_code"
+  >
+>;
 export const listDeclarations = (oid: string) =>
   listRows<Declaration>("declarations", oid);
-export const createDeclaration = (oid: string, taxYear: number) =>
-  saveRow<Declaration>("declarations", oid, { taxYear });
+export const createDeclaration = (
+  oid: string,
+  taxYear: number,
+  fields?: DeclarationInput,
+) => saveRow<Declaration>("declarations", oid, { taxYear, ...(fields ?? {}) });
 
 // ---- Spouse (filing-status driven; one per user) ----
 export type Spouse = {
