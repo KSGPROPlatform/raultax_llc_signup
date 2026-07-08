@@ -91,7 +91,9 @@ export default function OnboardingPage() {
   const [finishing, setFinishing] = useState(false);
   const [personal, setPersonal] = useState<Partial<PersonalInfoValues>>({});
   const [savingPersonal, setSavingPersonal] = useState(false);
-  const [loadedPersonal, setLoadedPersonal] = useState(false);
+  // Nothing renders until the saved year + resume position have loaded, so the
+  // stepper never flashes the default year / first step before jumping.
+  const [loaded, setLoaded] = useState(false);
   const [taxYear, setTaxYear] = useState<number>(allowedTaxYears()[0]);
   const [savingYear, setSavingYear] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,7 +159,7 @@ export default function OnboardingPage() {
       if (has.year && furthest >= 0) {
         setStep(Math.min(furthest + 1, localSteps.length - 1));
       }
-      setLoadedPersonal(true);
+      setLoaded(true);
     })();
     return () => {
       active = false;
@@ -225,6 +227,12 @@ export default function OnboardingPage() {
           </span>
         </div>
 
+        {!loaded ? (
+          <div className="grid place-items-center rounded-2xl border border-zinc-200 bg-white py-20 text-zinc-400 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        ) : (
+          <>
         {/* Progress */}
         <div className="mb-2 flex items-center justify-between">
           <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
@@ -283,24 +291,19 @@ export default function OnboardingPage() {
                 </p>
               </div>
             )}
-            {currentKey === "personal" &&
-              (loadedPersonal ? (
-                <>
-                  <div className="mb-4">
-                    <FormError message={error} />
-                  </div>
-                  <PersonalInfoForm
-                    initial={personal}
-                    busy={savingPersonal}
-                    submitLabel="Save & continue"
-                    onSubmit={savePersonal}
-                  />
-                </>
-              ) : (
-                <div className="grid place-items-center py-10 text-zinc-400">
-                  <Loader2 className="h-6 w-6 animate-spin" />
+            {currentKey === "personal" && (
+              <>
+                <div className="mb-4">
+                  <FormError message={error} />
                 </div>
-              ))}
+                <PersonalInfoForm
+                  initial={personal}
+                  busy={savingPersonal}
+                  submitLabel="Save & continue"
+                  onSubmit={savePersonal}
+                />
+              </>
+            )}
             {currentKey === "spouse" && <SpouseSection mode={spouseMode} />}
             {currentKey === "dependents" && <DependentsSection />}
             {currentKey === "bank" && <BankSection />}
@@ -387,6 +390,8 @@ export default function OnboardingPage() {
             </div>
           )}
         </div>
+          </>
+        )}
       </div>
     </main>
   );
