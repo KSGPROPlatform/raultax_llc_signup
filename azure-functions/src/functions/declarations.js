@@ -92,7 +92,7 @@ app.http("declarations", {
                    inserted.state_province, inserted.postal_code,
                    inserted.created_at, inserted.updated_at;
           `);
-        const row = result.recordset[0];
+        let row = result.recordset[0];
         const fresh = row && row.merge_action === "INSERT";
         delete row.merge_action;
 
@@ -149,6 +149,17 @@ app.http("declarations", {
                     FROM raul_tax_spouse WHERE owner_oid = @oid AND tax_year = @src;
                 END
               `);
+            // Re-read so the response reflects the copied-forward fields.
+            const reread = await pool
+              .request()
+              .input("oid", sql.NVarChar(64), b.oid)
+              .input("year", sql.Int, taxYear).query(`
+                SELECT id, owner_oid, tax_year, status, ${FIELD_COLS},
+                       created_at, updated_at
+                FROM raul_tax_declarations
+                WHERE owner_oid = @oid AND tax_year = @year;
+              `);
+            if (reread.recordset[0]) row = reread.recordset[0];
           } catch (copyErr) {
             // Best-effort: a failed copy must never block starting the year.
             context.error("declaration copy-forward failed", copyErr);
