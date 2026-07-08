@@ -1,5 +1,6 @@
 import "server-only";
 import { getSpouse, getUserProfile } from "./profileData";
+import { activeTaxYear } from "./activeYear";
 
 // The identity an SSN card must match: the user's own profile for ssn_copy, the
 // spouse record for spouse_ssn_copy. Saved data wins; the form's typed values
@@ -13,7 +14,7 @@ export async function resolveExpectedIdentity(
   let name = "";
   let ssn = "";
   if (docType === "spouse_ssn_copy") {
-    const s = await getSpouse(oid);
+    const s = await getSpouse(oid, await activeTaxYear());
     name = [s?.first_name, s?.last_name].filter(Boolean).join(" ");
     ssn = s?.ssn ?? "";
   } else {

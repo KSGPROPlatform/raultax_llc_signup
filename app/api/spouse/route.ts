@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getSpouse, saveSpouse, type SpouseInput } from "@/lib/profileData";
+import { activeTaxYear } from "@/lib/activeYear";
 
-// GET /api/spouse — the signed-in user's spouse (or null).
+// GET /api/spouse — the signed-in user's spouse for the active tax year (or null).
 export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const spouse = await getSpouse(user.sub);
+  const spouse = await getSpouse(user.sub, await activeTaxYear());
   return NextResponse.json({ spouse });
 }
 
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     if (typeof body[f] === "string") data[f] = body[f] as string;
   }
   try {
-    const spouse = await saveSpouse(user.sub, data);
+    const spouse = await saveSpouse(user.sub, data, await activeTaxYear());
     return NextResponse.json({ spouse });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Save failed.";

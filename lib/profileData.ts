@@ -24,10 +24,14 @@ function fnUrl(
 }
 
 // Rendered during SSR / called from route handlers — list never throws.
-async function listRows<T>(route: string, oid: string): Promise<T[]> {
+async function listRows<T>(
+  route: string,
+  oid: string,
+  params: Record<string, string | number | undefined> = {},
+): Promise<T[]> {
   if (!base) return [];
   try {
-    const res = await fetch(fnUrl(route, { oid }), {
+    const res = await fetch(fnUrl(route, { oid, ...params }), {
       headers: APP_HEADERS,
       cache: "no-store",
       signal: AbortSignal.timeout(10000),
@@ -88,10 +92,10 @@ export type DependentInput = {
   date_of_birth: string;
   relationship: string;
 };
-export const listDependents = (oid: string) =>
-  listRows<Dependent>("dependents", oid);
-export const saveDependent = (oid: string, d: DependentInput) =>
-  saveRow<Dependent>("dependents", oid, d);
+export const listDependents = (oid: string, taxYear?: number) =>
+  listRows<Dependent>("dependents", oid, { taxYear });
+export const saveDependent = (oid: string, d: DependentInput, taxYear?: number) =>
+  saveRow<Dependent>("dependents", oid, { ...d, tax_year: taxYear });
 export const deleteDependent = (oid: string, id: number) =>
   deleteRow("dependents", oid, id);
 
@@ -111,10 +115,10 @@ export type BankAccountInput = {
   account_number: string;
   routing_number: string;
 };
-export const listBankAccounts = (oid: string) =>
-  listRows<BankAccount>("bankAccounts", oid);
-export const saveBankAccount = (oid: string, b: BankAccountInput) =>
-  saveRow<BankAccount>("bankAccounts", oid, b);
+export const listBankAccounts = (oid: string, taxYear?: number) =>
+  listRows<BankAccount>("bankAccounts", oid, { taxYear });
+export const saveBankAccount = (oid: string, b: BankAccountInput, taxYear?: number) =>
+  saveRow<BankAccount>("bankAccounts", oid, { ...b, tax_year: taxYear });
 export const deleteBankAccount = (oid: string, id: number) =>
   deleteRow("bankAccounts", oid, id);
 
@@ -135,10 +139,10 @@ export type CompanyInput = {
   ein: string;
   activities: string;
 };
-export const listCompanies = (oid: string) =>
-  listRows<Company>("companies", oid);
-export const saveCompany = (oid: string, c: CompanyInput) =>
-  saveRow<Company>("companies", oid, c);
+export const listCompanies = (oid: string, taxYear?: number) =>
+  listRows<Company>("companies", oid, { taxYear });
+export const saveCompany = (oid: string, c: CompanyInput, taxYear?: number) =>
+  saveRow<Company>("companies", oid, { ...c, tax_year: taxYear });
 export const deleteCompany = (oid: string, id: number) =>
   deleteRow("companies", oid, id);
 
@@ -194,8 +198,10 @@ export type Job = {
   updated_at: string;
 };
 export type JobInput = { id?: number; job_name: string };
-export const listJobs = (oid: string) => listRows<Job>("jobs", oid);
-export const saveJob = (oid: string, j: JobInput) => saveRow<Job>("jobs", oid, j);
+export const listJobs = (oid: string, taxYear?: number) =>
+  listRows<Job>("jobs", oid, { taxYear });
+export const saveJob = (oid: string, j: JobInput, taxYear?: number) =>
+  saveRow<Job>("jobs", oid, { ...j, tax_year: taxYear });
 export const deleteJob = (oid: string, id: number) => deleteRow("jobs", oid, id);
 
 // ---- Declarations (one per user + tax year; the year is the filing's key) ----
@@ -206,6 +212,11 @@ export type Declaration = {
   status: string; // draft | submitted (future)
   created_at: string;
   updated_at: string;
+  // Per-year section counts (from the declarations function's GET).
+  jobs?: number;
+  bank_accounts?: number;
+  companies?: number;
+  dependents?: number;
 };
 export const listDeclarations = (oid: string) =>
   listRows<Declaration>("declarations", oid);
@@ -243,10 +254,10 @@ export type SpouseInput = Partial<
   >
 >;
 
-export async function getSpouse(oid: string): Promise<Spouse | null> {
+export async function getSpouse(oid: string, taxYear?: number): Promise<Spouse | null> {
   if (!base) return null;
   try {
-    const res = await fetch(fnUrl("spouse", { oid }), {
+    const res = await fetch(fnUrl("spouse", { oid, taxYear }), {
       headers: APP_HEADERS,
       cache: "no-store",
       signal: AbortSignal.timeout(10000),
@@ -259,8 +270,8 @@ export async function getSpouse(oid: string): Promise<Spouse | null> {
     return null;
   }
 }
-export const saveSpouse = (oid: string, s: SpouseInput) =>
-  saveRow<Spouse>("spouse", oid, s);
+export const saveSpouse = (oid: string, s: SpouseInput, taxYear?: number) =>
+  saveRow<Spouse>("spouse", oid, { ...s, tax_year: taxYear });
 
 // ---- The signed-in user's own saved personal profile ----
 // Reads the user's raul_tax_users row via the manageUsers function (scoped to

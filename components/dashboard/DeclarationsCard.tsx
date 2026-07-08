@@ -6,25 +6,20 @@ import { FileText, Plus, ArrowRight, CheckCircle2, Loader2 } from "lucide-react"
 import type { Declaration } from "@/lib/profileData";
 import { allowedTaxYears } from "@/lib/taxYear";
 
-type Counts = { bank: number; companies: number; jobs: number; personalDone: boolean };
-
 // The dashboard's tax-declaration hub (replaces the year dropdown + profile
 // checklist):
 //   - No declarations yet -> a single "Declare your tax" call-to-action (no
 //     progress bar) that opens onboarding at the year-selection step.
-//   - Otherwise -> one row per started year with its progress and a Continue
-//     button (the active year highlighted), plus a "Declare tax" button that
-//     opens the year-selection form (started years disabled there); the button
-//     hides once every available year is started.
-export function DeclarationsCard({
-  onboardingComplete,
-}: {
-  onboardingComplete: boolean;
-}) {
+//   - Otherwise -> one row per started year with its OWN per-year progress
+//     (section counts come back with each declaration) and a Continue button
+//     (the active year highlighted), plus a "Declare tax" button that opens the
+//     year-selection form (started years disabled there); the button hides once
+//     every available year is started.
+export function DeclarationsCard() {
   const router = useRouter();
   const [decls, setDecls] = useState<Declaration[] | null>(null);
   const [activeYear, setActiveYear] = useState<number | null>(null);
-  const [counts, setCounts] = useState<Counts | null>(null);
+  const [personalDone, setPersonalDone] = useState(false);
   const [busyYear, setBusyYear] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,43 +30,34 @@ export function DeclarationsCard({
         fetch(url)
           .then((r) => (r.ok ? r.json() : {}))
           .catch(() => ({}));
-      const len = (v: unknown) => (Array.isArray(v) ? v.length : 0);
-      const [d, b, c, j, p] = await Promise.all([
+      const [d, p] = await Promise.all([
         get("/api/declarations"),
-        get("/api/bank-accounts"),
-        get("/api/companies"),
-        get("/api/jobs"),
         get("/api/profile/personal"),
       ]);
       if (!active) return;
       setDecls(Array.isArray(d.rows) ? (d.rows as Declaration[]) : []);
       setActiveYear(typeof d.selectedYear === "number" ? d.selectedYear : null);
       const profile = (p.profile ?? {}) as Record<string, string>;
-      setCounts({
-        bank: len(b.rows),
-        companies: len(c.rows),
-        jobs: len(j.rows),
-        personalDone: Boolean((profile.date_of_birth ?? "").trim()),
-      });
+      setPersonalDone(Boolean((profile.date_of_birth ?? "").trim()));
     })();
     return () => {
       active = false;
     };
   }, []);
 
-  if (!decls || !counts) return null;
+  if (!decls) return null;
 
-  // Phase 1: profile data is shared across years, so every row shows the same
-  // progress; it becomes truly per-year when the tables are year-scoped.
-  const items = [
-    counts.personalDone,
-    counts.jobs > 0,
-    counts.bank > 0,
-    counts.companies > 0,
-  ];
-  const pct = onboardingComplete
-    ? 100
-    : Math.round((items.filter(Boolean).length / items.length) * 100);
+  // Per-year progress: personal info is profile-level; the section counts come
+  // back per declaration year.
+  const rowPct = (r: Declaration) => {
+    const items = [
+      personalDone,
+      (r.jobs ?? 0) > 0,
+      (r.bank_accounts ?? 0) > 0,
+      (r.companies ?? 0) > 0,
+    ];
+    return Math.round((items.filter(Boolean).length / items.length) * 100);
+  };
 
   const started = new Set(decls.map((r) => r.tax_year));
   const remaining = allowedTaxYears().filter((y) => !started.has(y));
@@ -157,6 +143,7 @@ export function DeclarationsCard({
       <ul className="mt-4 space-y-2">
         {decls.map((r) => {
           const isActive = r.tax_year === activeYear;
+          const pct = rowPct(r);
           const complete = pct === 100;
           return (
             <li

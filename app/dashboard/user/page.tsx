@@ -59,7 +59,7 @@ export default async function UserDashboardPage() {
         </p>
       </header>
 
-      <DeclarationsCard onboardingComplete={user.onboardingComplete} />
+      <DeclarationsCard />
 
       {/* Profile */}
       <section className={`${cardClass} p-6`}>
