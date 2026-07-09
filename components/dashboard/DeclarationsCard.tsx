@@ -19,26 +19,21 @@ export function DeclarationsCard() {
   const router = useRouter();
   const [decls, setDecls] = useState<Declaration[] | null>(null);
   const [activeYear, setActiveYear] = useState<number | null>(null);
-  const [personalDone, setPersonalDone] = useState(false);
   const [busyYear, setBusyYear] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     (async () => {
-      const get = (url: string): Promise<Record<string, unknown>> =>
-        fetch(url)
-          .then((r) => (r.ok ? r.json() : {}))
-          .catch(() => ({}));
-      const [d, p] = await Promise.all([
-        get("/api/declarations"),
-        get("/api/profile/personal"),
-      ]);
-      if (!active) return;
-      setDecls(Array.isArray(d.rows) ? (d.rows as Declaration[]) : []);
-      setActiveYear(typeof d.selectedYear === "number" ? d.selectedYear : null);
-      const profile = (p.profile ?? {}) as Record<string, string>;
-      setPersonalDone(Boolean((profile.date_of_birth ?? "").trim()));
+      try {
+        const res = await fetch("/api/declarations");
+        const d = res.ok ? await res.json() : {};
+        if (!active) return;
+        setDecls(Array.isArray(d.rows) ? (d.rows as Declaration[]) : []);
+        setActiveYear(typeof d.selectedYear === "number" ? d.selectedYear : null);
+      } catch {
+        if (active) setDecls([]);
+      }
     })();
     return () => {
       active = false;
@@ -47,14 +42,22 @@ export function DeclarationsCard() {
 
   if (!decls) return null;
 
-  // Per-year progress: personal info is profile-level; the section counts come
-  // back per declaration year.
+  // Per-year progress, DYNAMIC by that year's filing status (mirrors the
+  // onboarding steps):
+  //  - personal: that year's filing status is saved
+  //  - spouse:   only counted for Married filing jointly/separately
+  //  - business: a company exists OR the user answered "No establishment"
+  //  - dependents are optional and never block 100%
   const rowPct = (r: Declaration) => {
+    const fs = (r.filing_status ?? "").trim();
+    const needsSpouse =
+      fs === "Married filing jointly" || fs === "Married filing separately";
     const items = [
-      personalDone,
+      Boolean(fs), // personal (per-year)
+      ...(needsSpouse ? [(r.spouse ?? 0) > 0] : []),
       (r.jobs ?? 0) > 0,
       (r.bank_accounts ?? 0) > 0,
-      (r.companies ?? 0) > 0,
+      (r.companies ?? 0) > 0 || r.owns_establishment === false,
     ];
     return Math.round((items.filter(Boolean).length / items.length) * 100);
   };

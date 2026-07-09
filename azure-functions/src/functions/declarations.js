@@ -30,7 +30,10 @@ app.http("declarations", {
           .input("oid", sql.NVarChar(64), oid).query(`
             SELECT d.id, d.owner_oid, d.tax_year, d.status,
               d.filing_status, d.marital_status, d.street_address, d.city,
-              d.state_province, d.postal_code, d.created_at, d.updated_at,
+              d.state_province, d.postal_code, d.owns_establishment,
+              d.created_at, d.updated_at,
+              (SELECT COUNT(*) FROM raul_tax_spouse s
+                 WHERE s.owner_oid = d.owner_oid AND s.tax_year = d.tax_year)  AS spouse,
               (SELECT COUNT(*) FROM raul_tax_jobs j
                  WHERE j.owner_oid = d.owner_oid AND j.tax_year = d.tax_year)  AS jobs,
               (SELECT COUNT(*) FROM raul_tax_bank_accounts b
@@ -57,11 +60,14 @@ app.http("declarations", {
         const orNull = (v) => (typeof v === "string" ? v : null);
         const status =
           b.status === "submitted" || b.status === "draft" ? b.status : null;
+        const ownsBit =
+          typeof b.owns_establishment === "boolean" ? (b.owns_establishment ? 1 : 0) : null;
         const result = await pool
           .request()
           .input("oid", sql.NVarChar(64), b.oid)
           .input("year", sql.Int, taxYear)
           .input("status", sql.NVarChar(16), status)
+          .input("owns", sql.Bit, ownsBit)
           .input("filing_status", sql.NVarChar(64), orNull(b.filing_status))
           .input("marital_status", sql.NVarChar(64), orNull(b.marital_status))
           .input("street_address", sql.NVarChar(256), orNull(b.street_address))
@@ -73,6 +79,7 @@ app.http("declarations", {
               ON t.owner_oid = s.owner_oid AND t.tax_year = s.tax_year
             WHEN MATCHED THEN UPDATE SET
               status         = COALESCE(@status, t.status),
+              owns_establishment = COALESCE(@owns, t.owns_establishment),
               filing_status  = COALESCE(@filing_status, t.filing_status),
               marital_status = COALESCE(@marital_status, t.marital_status),
               street_address = COALESCE(@street_address, t.street_address),
@@ -81,13 +88,14 @@ app.http("declarations", {
               postal_code    = COALESCE(@postal_code, t.postal_code),
               updated_at = SYSUTCDATETIME()
             WHEN NOT MATCHED THEN INSERT
-              (owner_oid, tax_year, status, ${FIELD_COLS})
-              VALUES (@oid, @year, COALESCE(@status, 'draft'),
+              (owner_oid, tax_year, status, owns_establishment, ${FIELD_COLS})
+              VALUES (@oid, @year, COALESCE(@status, 'draft'), @owns,
                       COALESCE(@filing_status, ''), COALESCE(@marital_status, ''),
                       COALESCE(@street_address, ''), COALESCE(@city, ''),
                       COALESCE(@state_province, ''), COALESCE(@postal_code, ''))
             OUTPUT $action AS merge_action, inserted.id, inserted.owner_oid,
-                   inserted.tax_year, inserted.status, inserted.filing_status,
+                   inserted.tax_year, inserted.status, inserted.owns_establishment,
+                   inserted.filing_status,
                    inserted.marital_status, inserted.street_address, inserted.city,
                    inserted.state_province, inserted.postal_code,
                    inserted.created_at, inserted.updated_at;
@@ -115,6 +123,7 @@ app.http("declarations", {
                 IF @src IS NOT NULL
                 BEGIN
                   UPDATE dnew SET
+                    owns_establishment = COALESCE(dnew.owns_establishment, dsrc.owns_establishment),
                     filing_status  = CASE WHEN dnew.filing_status  = '' THEN dsrc.filing_status  ELSE dnew.filing_status  END,
                     marital_status = CASE WHEN dnew.marital_status = '' THEN dsrc.marital_status ELSE dnew.marital_status END,
                     street_address = CASE WHEN dnew.street_address = '' THEN dsrc.street_address ELSE dnew.street_address END,
@@ -154,8 +163,8 @@ app.http("declarations", {
               .request()
               .input("oid", sql.NVarChar(64), b.oid)
               .input("year", sql.Int, taxYear).query(`
-                SELECT id, owner_oid, tax_year, status, ${FIELD_COLS},
-                       created_at, updated_at
+                SELECT id, owner_oid, tax_year, status, owns_establishment,
+                       ${FIELD_COLS}, created_at, updated_at
                 FROM raul_tax_declarations
                 WHERE owner_oid = @oid AND tax_year = @year;
               `);

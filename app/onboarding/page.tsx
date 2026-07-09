@@ -11,6 +11,7 @@ import {
 import { SpouseSection } from "@/components/dashboard/SpouseSection";
 import { SelectField } from "@/components/forms/Field";
 import { allowedTaxYears } from "@/lib/taxYear";
+import type { Declaration } from "@/lib/profileData";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
@@ -150,6 +151,10 @@ function OnboardingFlow() {
       if (pf.profile) setPersonal(profile);
       const localSteps = buildSteps(profile.filing_status ?? "");
       const spouse = (sp.spouse ?? null) as Record<string, string> | null;
+      // The active year's declaration row ("answered no establishment" lives there).
+      const activeDecl = (Array.isArray(decl.rows) ? (decl.rows as Declaration[]) : []).find(
+        (r) => r.tax_year === decl.selectedYear,
+      );
       const has: Record<StepKey, boolean> = {
         year: len(decl.rows) > 0,
         personal: Boolean((profile.date_of_birth ?? "").trim()),
@@ -160,7 +165,7 @@ function OnboardingFlow() {
         dependents: len(dep.rows) > 0,
         bank: len(bank.rows) > 0,
         jobs: len(jobs.rows) > 0,
-        business: len(co.rows) > 0,
+        business: len(co.rows) > 0 || activeDecl?.owns_establishment === false,
         finish: false,
       };
       setHasData(has);

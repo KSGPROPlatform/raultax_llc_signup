@@ -143,12 +143,12 @@ export default async function UserDashboardPage() {
         <BankSection />
       </section>
 
-      {/* Companies */}
+      {/* Companies — the "owns an establishment?" answer is per-year now */}
       <section id="companies" className="scroll-mt-6 space-y-4">
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
           My companies
         </h2>
-        <CompaniesSection initialOwns={user.ownsEstablishment} />
+        <CompaniesSection initialOwns={active?.owns_establishment ?? undefined} />
       </section>
 
       {/* Jobs */}

@@ -224,6 +224,8 @@ export type Declaration = {
   city?: string;
   state_province?: string;
   postal_code?: string;
+  // Per-year "do you own an establishment?" answer: null = not asked yet.
+  owns_establishment?: boolean | null;
   created_at: string;
   updated_at: string;
   // Per-year section counts (from the declarations function's GET).
@@ -231,6 +233,7 @@ export type Declaration = {
   bank_accounts?: number;
   companies?: number;
   dependents?: number;
+  spouse?: number;
 };
 // Per-year fields accepted by the upsert (absent fields are kept server-side).
 export type DeclarationInput = Partial<
@@ -243,6 +246,7 @@ export type DeclarationInput = Partial<
     | "city"
     | "state_province"
     | "postal_code"
+    | "owns_establishment"
   >
 >;
 export const listDeclarations = (oid: string) =>
