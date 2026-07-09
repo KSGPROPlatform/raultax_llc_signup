@@ -218,10 +218,31 @@ taxable income before QBI ≤ $197,300 ($394,600 MFJ).**
   $500k/$250k; mortgage interest from **Form 1098 (doc type 'mortgage'
   already collected/extractable — future automation)**; charity; 17 = total.
 
-**Computation order (dependency graph):**
-income spine (1z…11a) → 11b → 12a–d age boxes (DOB) → 12e → 13b (Sch 1-A)
-→ 8995 → 13a → 14 → 15 → 16 (brackets) → Sch 2 part I → 17 → 18 → 8812 →
-19 → Sch 3 part I → 20 → 21 → 22 → Sch SE/Sch 2 part II → 23 → 24.
+**Schedule SE (2025, uploaded) → table `raul_tax_schedule_se`. Trigger:
+Σ business nets such that 4c ≥ $400. FULLY COMPUTABLE v1.**
+- 1a/1b farm (Sch F) parked → 0; **2 = Σ company P&L nets (Schedule C)**
+- 3 = 1a+1b+2; 4a = 3 > 0 ? 3 × **92.35%** : 3; 4b optional methods parked
+  (Part II constants: $7,240 max, $7,840, $10,860, 72.189%); 4c = 4a+4b —
+  **if < $400 → stop, no SE tax**
+- 5a church income parked; 6 = 4c + 5b
+- 7 = **$176,100** (2025); **8a = Σ W-2 (box 3 + box 7) — extracted**;
+  8b (4137) parked; 8c ← Form 8919 line 10; 8d = 8a+8b+8c
+- 9 = max(0, 7 − 8d); 10 = min(6, 9) × **12.4%**; 11 = 6 × **2.9%**
+- **12 = 10 + 11 → Schedule 2 line 4 → 1040 line 23 (SE tax)**
+- **13 = 12 × 50% → Schedule 1 line 15** (feeds 1040 line 10 → AGI)
+
+**Computation order (dependency graph — CORRECTED: SE computes EARLY because
+its line 13 feeds AGI):**
+1z + Sch 1 Part I (business) → **Schedule SE** (needs only P&L + W-2 boxes
+3/7) → Sch 1 Part II (s1_15 = SE line 13) → line 10 → 11a → 11b → 12a–d age
+boxes (DOB) → 12e → 13b (Sch 1-A) → 8995 → 13a → 14 → 15 → 16 (brackets) →
+Sch 2 Part I → 17 → 18 → 8812 → 19 → Sch 3 Part I → 20 → 21 → 22 →
+Sch 2 Part II (SE line 12) → 23 → 24 → payments → 33 → 34/37.
+
+**Column tally (agreed):** raul_tax_form_1040 = 57 line columns + ~9
+bookkeeping (id, owner_oid, tax_year, computed_at, frozen, flags, overrides,
+timestamps) ≈ 66. raul_tax_schedule1 ≈ 65. raul_tax_schedule_se ≈ 28.
+Module tables (Sch 2/3, 8812, 8995) created with their modules.
 
 ### Payments & Refundable Credits (25–33) — CLOSED (v1 scope)
 | Column | Formula |
