@@ -223,8 +223,46 @@ income spine (1z…11a) → 11b → 12a–d age boxes (DOB) → 12e → 13b (Sch
 → 8995 → 13a → 14 → 15 → 16 (brackets) → Sch 2 part I → 17 → 18 → 8812 →
 19 → Sch 3 part I → 20 → 21 → 22 → Sch SE/Sch 2 part II → 23 → 24.
 
+### Payments & Refundable Credits (25–33) — CLOSED (v1 scope)
+| Column | Formula |
+|---|---|
+| `line_25a` | **Σ W-2 box 2 (FederalIncomeTaxWithheld) over the year's verified W-2s** |
+| `line_25b` | Σ federal withholding from the year's verified 1099 extractions |
+| `line_25c` | parked |
+| `line_25d` | = 25a + 25b + 25c |
+| `line_26` | estimated payments — parked; needs one input field later; preparer override meanwhile |
+| `line_27a` | EIC — module later; v1 flags likely-eligible returns for preparer (tables per year, eligibility tests) |
+| `line_28` | additional CTC ← Schedule 8812 Part II-A |
+| `line_29` | parked (Form 8863) |
+| `line_30` | refundable adoption credit ← Form 8839 line 13 |
+| `line_31` | ← Schedule 3 line 15 |
+| `line_32` | = 27a + 28 + 29 + 30 + 31 |
+| `line_33` | = 25d + 26 + 32 — total payments |
+
+### Refund / Amount Owed (34–38) — CLOSED (v1 scope)
+| Column | Formula |
+|---|---|
+| `line_34` | max(0, 33 − 24) — overpaid |
+| `line_35a` | refund (v1 = 34; line 36 split parked) |
+| 35b/35c/35d | direct deposit ← bank record (routing/account collected & verified). **GAP: add Checking/Savings selector to the bank form** |
+| `line_36` | parked |
+| `line_37` | max(0, 24 − 33) — amount owed |
+| `line_38` | parked (penalty — preparer) |
+
+## THE FULL 1040 IS MAPPED (v1)
+End-to-end computable chain from collected data:
+W-2 box 1 → 1a/1z; P&L → Sch C → Sch 1 → 8; 9; 10; 11a/11b; std deduction
+(rules) + senior deduction (Sch 1-A P.V) → 12e/13b; QBI 8995 → 13a; 14; 15;
+brackets → 16; 18; 8812 → 19/28; 20; 21; 22; Sch SE → 23; **24 total tax**;
+W-2 box 2 → 25a/25d; 32; **33 total payments**; **34 refund / 37 owed** +
+direct deposit.
+
+Remaining small inputs to add when implementing: estimated payments (26),
+Checking/Savings on bank form (35c), digital-assets Y/N (header, parked),
+dependent checkboxes (credit split confirm).
+
 ## Discussion status
-- 2026-07-09: page 1 complete (income spine computable end-to-end); Tax &
-  Credits 11b–24 closed for v1. NEXT: Payments & Refundable Credits (25–33) —
-  incl. line 25a = Σ W-2 box 2 (already extracted) — then Refund/Amount Owed
-  (34–37, bank direct deposit) to finish the form.
+- 2026-07-09: **complete — every 1040 line mapped** (computable v1 / module /
+  parked-with-column). Next milestone: implement — SQL (1040 + schedule
+  tables), rules files (2022–2025, constants VERIFIED at build time),
+  calc1040 function with per-line functions, review page (preparer-first).
