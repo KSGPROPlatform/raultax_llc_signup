@@ -53,17 +53,18 @@ function gateResult(docType, flat, expected) {
     // The W-2 employee SSN / 1099 recipient TIN must belong to the account
     // holder. Forms often mask all but the LAST 4 DIGITS, so: full compare when
     // the form shows all 9, last-4 compare otherwise; unreadable -> reject.
-    if (expected.ssn) {
-      const formSsn = digits(flat.ssn);
-      const userSsn = digits(expected.ssn);
-      if (formSsn.length >= 9 && userSsn.length >= 9) {
-        if (formSsn.slice(-9) !== userSsn.slice(-9)) return { reason: "ssn_mismatch" };
-      } else if (formSsn.length >= 4) {
-        if (formSsn.slice(-4) !== userSsn.slice(-4)) return { reason: "ssn_mismatch" };
-      } else {
-        return { reason: "ssn_unreadable" };
-      }
-    }
+    // TEMP DISABLED per Doane (2026-07-09) — re-enable by uncommenting.
+    // if (expected.ssn) {
+    //   const formSsn = digits(flat.ssn);
+    //   const userSsn = digits(expected.ssn);
+    //   if (formSsn.length >= 9 && userSsn.length >= 9) {
+    //     if (formSsn.slice(-9) !== userSsn.slice(-9)) return { reason: "ssn_mismatch" };
+    //   } else if (formSsn.length >= 4) {
+    //     if (formSsn.slice(-4) !== userSsn.slice(-4)) return { reason: "ssn_mismatch" };
+    //   } else {
+    //     return { reason: "ssn_unreadable" };
+    //   }
+    // }
     // The employee (W-2) / recipient (1099) printed on the form must be the
     // account holder.
     if (expected.name) {
@@ -80,9 +81,10 @@ function gateResult(docType, flat, expected) {
     }
   }
   if (IDENTITY_DOCS.has(docType)) {
-    if (expected.ssn && digits(flat.ssn) !== digits(expected.ssn)) {
-      return { reason: "ssn_mismatch" };
-    }
+    // TEMP DISABLED per Doane (2026-07-09) — re-enable by uncommenting.
+    // if (expected.ssn && digits(flat.ssn) !== digits(expected.ssn)) {
+    //   return { reason: "ssn_mismatch" };
+    // }
     if (expected.name) {
       if (!String(flat.name ?? "").trim()) return { reason: "name_unreadable" };
       if (!nameMatches(expected.name, flat.name)) return { reason: "name_mismatch" };

@@ -3,7 +3,8 @@ import { getSpouse, getUserProfile } from "./profileData";
 import { listFiles, getExtraction } from "./files";
 import { activeTaxYear } from "./activeYear";
 
-const digitsOf = (v: unknown) => String(v ?? "").replace(/\D/g, "");
+// TEMP: only used by the disabled SSN cross-check below — restore with it.
+// const digitsOf = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 
 // The typed first AND last name must both appear as tokens in the card's name
 // (case-insensitive, any order — tolerates middle names/initials on the card).
@@ -65,11 +66,13 @@ export async function cardConsistencyError(
     }
     const who = docType === "spouse_ssn_copy" ? "your spouse's" : "your";
 
-    const cardSsn = digitsOf(fields.ssn);
-    const savedSsn = digitsOf(saving.ssn);
-    if (cardSsn && savedSsn && cardSsn !== savedSsn) {
-      return `The Social Security number doesn't match ${who} uploaded SSN card — update the number or replace the card.`;
-    }
+    // TEMP DISABLED per Doane (2026-07-09) — SSN cross-check off everywhere
+    // for now (also in analyzeDocument's gates); re-enable by uncommenting.
+    // const cardSsn = digitsOf(fields.ssn);
+    // const savedSsn = digitsOf(saving.ssn);
+    // if (cardSsn && savedSsn && cardSsn !== savedSsn) {
+    //   return `The Social Security number doesn't match ${who} uploaded SSN card — update the number or replace the card.`;
+    // }
     const cardName = String(fields.name ?? "").trim();
     const savingName = (saving.name ?? "").trim();
     if (cardName && savingName && !nameMatches(savingName, cardName)) {
