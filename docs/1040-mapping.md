@@ -318,7 +318,17 @@ yearly rules-file onboarding process.
 
 Forms to upload at v2 start: Schedule B, Schedule EIC, Form 8863, full Sch C.
 
-## Discussion status
-- 2026-07-09: **complete — every 1040 line mapped**; roadmap agreed.
-  Awaiting Schedule SE upload (last v1 form) → then implementation begins
-  with the schema SQL.
+## Implementation status
+- 2026-07-09: mapping complete; roadmap agreed; Schedule SE specced.
+- 2026-07-09 (build): **DONE** — `azure-functions/sql/create_1040_tables.sql`
+  (3 tables); `src/taxRules/2025.js` (all constants sourced: printed forms +
+  IRS.gov + Tax Foundation post-OBBBA; resolver refuses unverified years);
+  `src/taxEngine.js` (pure per-line engine per this ledger);
+  `test/taxEngine.test.js` (3 hand-computed golden returns + guards —
+  **36/36 pass**). v1 engine notes: tax via rate schedule (IRS Tax Table under
+  $100k may differ by a few dollars — preparer reviews); QBI = Schedule C net
+  (simplification); blindness boxes = preparer override.
+- **NEXT**: Doane runs create_1040_tables.sql → calc1040 HTTP function
+  (snapshot loader + engine + upsert + overrides/freeze) → preparer review
+  page (admin) → user review + submit gate. Rules for 2022–2024: add when
+  verified (engine refuses them until then).
