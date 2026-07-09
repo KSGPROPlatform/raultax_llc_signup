@@ -36,9 +36,10 @@ const EMPTY: SpouseValues = {
 
 // Spouse form. `mode` is driven by the Form-1 filing status:
 //   "full" (Married filing jointly) — name, DOB, SSN, address + spouse SSN doc.
-//   "ssn"  (Married filing separately) — the spouse's SSN only.
-// onSubmit receives only the fields relevant to the mode, so an SSN-only save
-// never wipes a fuller record.
+//   "ssn"  (Married filing separately) — the spouse's NAME + SSN (the 1040's
+//   MFS line requires the spouse's full name alongside the SSN).
+// onSubmit receives only the fields relevant to the mode, so an MFS save never
+// wipes a fuller record.
 export function SpouseForm({
   mode,
   initial,
@@ -71,26 +72,30 @@ export function SpouseForm({
     setTouched({ ssn: true, date_of_birth: true });
     if (ssnErr) return; // spouse SSN must be valid (both modes)
     if (mode === "full" && dobErr) return;
-    onSubmit(mode === "ssn" ? { ssn: v.ssn } : v);
+    onSubmit(
+      mode === "ssn"
+        ? { first_name: v.first_name, last_name: v.last_name, ssn: v.ssn }
+        : v,
+    );
   }
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {/* The spouse's name is needed in BOTH modes — the 1040's MFS line
+          requires the spouse's full name alongside the SSN. */}
+      <Field id="sp_first_name" label="Spouse first name" required maxLength={256} placeholder="e.g. Jane" value={v.first_name} onChange={setText("first_name")} autoComplete="off" />
+      <Field id="sp_last_name" label="Spouse last name" required maxLength={256} placeholder="e.g. Doe" value={v.last_name} onChange={setText("last_name")} autoComplete="off" />
       {mode === "full" && (
-        <>
-          <Field id="sp_first_name" label="Spouse first name" required maxLength={256} placeholder="e.g. Jane" value={v.first_name} onChange={setText("first_name")} autoComplete="off" />
-          <Field id="sp_last_name" label="Spouse last name" required maxLength={256} placeholder="e.g. Doe" value={v.last_name} onChange={setText("last_name")} autoComplete="off" />
-          <DateField
-            id="sp_dob"
-            label="Spouse date of birth"
-            required
-            value={v.date_of_birth}
-            onChange={setVal("date_of_birth")}
-            onBlur={() => setTouched((t) => ({ ...t, date_of_birth: true }))}
-            error={touched.date_of_birth ? dobErr : null}
-            hint={v.date_of_birth ? undefined : `Must be between ${range.min} and ${range.max}.`}
-          />
-        </>
+        <DateField
+          id="sp_dob"
+          label="Spouse date of birth"
+          required
+          value={v.date_of_birth}
+          onChange={setVal("date_of_birth")}
+          onBlur={() => setTouched((t) => ({ ...t, date_of_birth: true }))}
+          error={touched.date_of_birth ? dobErr : null}
+          hint={v.date_of_birth ? undefined : `Must be between ${range.min} and ${range.max}.`}
+        />
       )}
 
       <SsnField
