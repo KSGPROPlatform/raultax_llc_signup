@@ -81,11 +81,30 @@ starts only from what is written here.
 | **8839** (adoption) | W-2 box 12 **code T** | line 31 → `1f`; line 13 → 1040 line 30; line 18 → Schedule 3 6c | needs children/adoption details; max $17,280/child; phase-out $259,190 / $40,000 |
 | **8919** (uncollected SS/Medicare) | same firm on W-2 + 1099 (code H); else preparer | line 6 → `1g`; line 13 → Schedule 2 line 6 | SS wage cap $176,100; rates 6.2% / 1.45% |
 
-### Line 2 (interest) — NEXT, under discussion
-Sources available today: 1099-INT extractions (when uploaded). To be mapped.
+### Lines 2–7 — PARKED (columns only, per Doane 2026-07-09)
+Create the amount columns now, all NULL; formulas agreed later. Checkbox items
+(3c, 4c, 5c, 6c, 6d, 7b) are noted but get no columns yet.
+
+| Columns | Line |
+|---|---|
+| `line_2a`, `line_2b` | tax-exempt / taxable interest (future source: 1099-INT extractions; Schedule B trigger at > $1,500 taxable interest) |
+| `line_3a`, `line_3b` | qualified / ordinary dividends (future source: 1099-DIV extractions) |
+| `line_4a`, `line_4b` | IRA distributions / taxable amount (future source: 1099-R) |
+| `line_5a`, `line_5b` | pensions & annuities / taxable amount (future source: 1099-R) |
+| `line_6a`, `line_6b` | social security benefits / taxable amount |
+| `line_7a` | capital gain/(loss) — negatives allowed (Schedule D — likely preparer/flag) |
+
+### Line 8 — NEXT, under discussion (business income lands here)
+1040 line 8 = **Schedule 1, line 10**. Proposal on the table:
+- Schedule 1 line 3 (business income) = **Σ per-company P&L nets** for the year
+  (each company = one Schedule C; v1: Schedule C net = our P&L net, preparer
+  override for anything beyond simple income/expense lines).
+- Other Schedule 1 lines: parked columns in the Schedule 1 module.
+- Schedule 1 line 10 = sum of its Part I → 1040 `line_8`. Negatives allowed.
+- Side effect for later: business net ≥ $400 triggers **Schedule SE**
+  (self-employment tax → Schedule 2 → 1040 line 23).
 
 ## Discussion status
-- 2026-07-09: header block + line 1 fully mapped and closed. Next: line 2
-  (2a tax-exempt / 2b taxable interest), then 3 (dividends), 4–6 (retirement/SS),
-  7 (capital gains — likely flag-only), 8 (Schedule 1: business income from the
-  per-company P&L), 9–11 (totals/AGI).
+- 2026-07-09: header block + line 1 closed; lines 2–7 parked as columns.
+  Discussing line 8 (Schedule 1 / business income). Then 9 (total income),
+  10 (adjustments), 11 (AGI).
