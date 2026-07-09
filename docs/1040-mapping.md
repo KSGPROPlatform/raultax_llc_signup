@@ -261,8 +261,19 @@ Remaining small inputs to add when implementing: estimated payments (26),
 Checking/Savings on bank form (35c), digital-assets Y/N (header, parked),
 dependent checkboxes (credit split confirm).
 
+## Forms inventory
+Uploaded & specced (2025 editions): 1040, Sch 1, Sch 1-A, Sch 2, Sch 3,
+Sch 8812, Sch A, F2441, F8839, F8919, F8995 (+8995-A Sch A).
+**MISSING & NEEDED for v1: Schedule SE** (SE tax — Sch 2 line 4, Sch 1
+line 15). Referenced but parked (no form needed for v1): 8863, 6251, 8962,
+8880, 5695, 4137, 8959, 8960, full Schedule C.
+From the 1040 INSTRUCTIONS at build time (VERIFY rule): tax bracket tables
+(line 16), additional std deduction 65+/blind, 8812 Credit Limit Worksheet A,
+EIC tables.
+
 ## Discussion status
 - 2026-07-09: **complete — every 1040 line mapped** (computable v1 / module /
-  parked-with-column). Next milestone: implement — SQL (1040 + schedule
-  tables), rules files (2022–2025, constants VERIFIED at build time),
-  calc1040 function with per-line functions, review page (preparer-first).
+  parked-with-column). Awaiting Schedule SE upload to spec the SE module.
+  Next milestone: implement — SQL (1040 + schedule tables), rules files
+  (2022–2025, constants VERIFIED at build time), calc1040 function with
+  per-line functions, review page (preparer-first).
