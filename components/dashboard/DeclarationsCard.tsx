@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, ArrowRight, CheckCircle2, Loader2, Send } from "lucide-react";
+import { FileText, Plus, ArrowRight, CheckCircle2, Loader2, Send, Eye } from "lucide-react";
 import type { Declaration } from "@/lib/profileData";
 import { allowedTaxYears } from "@/lib/taxYear";
 
@@ -225,9 +226,17 @@ export function DeclarationsCard() {
                 </div>
               </div>
               {submitted ? (
-                <span className="flex shrink-0 flex-col items-end gap-1">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                    <CheckCircle2 className="h-4 w-4" /> Submitted
+                <span className="flex shrink-0 flex-col items-end gap-1.5">
+                  <span className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                      <CheckCircle2 className="h-4 w-4" /> Submitted
+                    </span>
+                    <Link
+                      href={`/dashboard/return?year=${r.tax_year}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+                    >
+                      <Eye className="h-4 w-4" /> View return
+                    </Link>
                   </span>
                   {results[r.tax_year]?.status === "approved" ? (
                     <span className="text-xs font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">

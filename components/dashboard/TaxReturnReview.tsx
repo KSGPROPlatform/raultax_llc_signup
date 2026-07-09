@@ -9,34 +9,7 @@ import type { Declaration } from "@/lib/profileData";
 // the flags, recompute, and Approve & freeze — freezing releases the headline
 // numbers to the user and stops recomputation.
 
-const LINES: [string, string][] = [
-  ["line_1a", "1a — Wages (W-2 box 1)"],
-  ["line_1z", "1z — Total wages"],
-  ["line_8", "8 — Additional income (Sch 1)"],
-  ["line_9", "9 — Total income"],
-  ["line_10", "10 — Adjustments (½ SE tax)"],
-  ["line_11a", "11a — Adjusted gross income"],
-  ["line_12e", "12e — Standard deduction"],
-  ["line_13a", "13a — QBI deduction (8995)"],
-  ["line_13b", "13b — Additional deductions (Sch 1-A)"],
-  ["line_14", "14 — Total deductions"],
-  ["line_15", "15 — Taxable income"],
-  ["line_16", "16 — Tax"],
-  ["line_18", "18 — Tax before credits"],
-  ["line_19", "19 — Child tax credit (8812)"],
-  ["line_22", "22 — Tax after credits"],
-  ["line_23", "23 — Other taxes (SE)"],
-  ["line_24", "24 — TOTAL TAX"],
-  ["line_25a", "25a — W-2 withholding"],
-  ["line_25b", "25b — 1099 withholding"],
-  ["line_25d", "25d — Total withholding"],
-  ["line_26", "26 — Estimated payments"],
-  ["line_28", "28 — Additional CTC"],
-  ["line_32", "32 — Other payments/credits"],
-  ["line_33", "33 — TOTAL PAYMENTS"],
-  ["line_34", "34 — REFUND"],
-  ["line_37", "37 — AMOUNT OWED"],
-];
+import { FORM_1040_LINES as LINES, FORM_1040_STRONG } from "@/lib/form1040Lines";
 
 type ReturnRow = Record<string, unknown> & {
   flags?: string[];
@@ -225,7 +198,7 @@ export function TaxReturnReview({ oid }: { oid: string }) {
               const ov = overrides[key];
               if (!Number.isFinite(Number(computed)) && !ov) return null;
               const isEditing = editing === key;
-              const strong = ["line_24", "line_33", "line_34", "line_37"].includes(key);
+              const strong = FORM_1040_STRONG.has(key);
               return (
                 <div
                   key={key}
