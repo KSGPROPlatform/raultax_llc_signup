@@ -14,13 +14,25 @@ import {
 import { DocUpload } from "@/components/documents/DocUpload";
 
 // Jobs manager — one user has many jobs; each job has its own W-2 + 1099.
-// Used in the onboarding "Jobs" step and the dashboard.
+// A job = OCCUPATION + COMPANY; the company is what the W-2's employer / the
+// 1099's payer are verified against. Used in onboarding and the dashboard.
+
+// Display label: "occupation · company", falling back to the legacy job_name.
+function jobTitle(j: Job): string {
+  return (
+    [j.occupation, j.company_name].filter(Boolean).join(" · ") ||
+    j.job_name ||
+    "Untitled job"
+  );
+}
+
 export function JobsSection() {
   const [rows, setRows] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Job | "new" | null>(null);
-  const [name, setName] = useState("");
+  const [occupation, setOccupation] = useState("");
+  const [company, setCompany] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -52,7 +64,13 @@ export function JobsSection() {
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, job_name: name }),
+        body: JSON.stringify({
+          id,
+          occupation,
+          company_name: company,
+          // Legacy combined label, kept for older views.
+          job_name: [occupation, company].filter(Boolean).join(" at "),
+        }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -70,7 +88,7 @@ export function JobsSection() {
   }
 
   async function remove(j: Job) {
-    if (!confirm(`Remove "${j.job_name || "this job"}" and unlink its documents?`)) return;
+    if (!confirm(`Remove "${jobTitle(j)}" and unlink its documents?`)) return;
     const res = await fetch(`/api/jobs/${j.id}`, { method: "DELETE" });
     if (res.ok) setRows((prev) => prev.filter((r) => r.id !== j.id));
     else setError("Could not remove the job.");
@@ -94,12 +112,13 @@ export function JobsSection() {
                   <Briefcase className="h-4 w-4" />
                 </span>
                 <div className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {j.job_name || "Untitled job"}
+                  {jobTitle(j)}
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    setName(j.job_name);
+                    setOccupation(j.occupation || "");
+                    setCompany(j.company_name || "");
                     setEditing(j);
                   }}
                   aria-label="Edit job"
@@ -117,8 +136,8 @@ export function JobsSection() {
                 </button>
               </div>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <DocUpload docType="w2" jobId={j.id} label={`W-2 — ${j.job_name || "job"}`} />
-                <DocUpload docType="form_1099" jobId={j.id} label={`1099 — ${j.job_name || "job"}`} />
+                <DocUpload docType="w2" jobId={j.id} label={`W-2 — ${j.company_name || j.job_name || "job"}`} />
+                <DocUpload docType="form_1099" jobId={j.id} label={`1099 — ${j.company_name || j.job_name || "job"}`} />
               </div>
             </div>
           ))}
@@ -127,20 +146,39 @@ export function JobsSection() {
         <SectionEmpty text="No jobs added yet." />
       )}
 
-      <AddButton label="Add job" onClick={() => { setName(""); setEditing("new"); }} />
+      <AddButton
+        label="Add job"
+        onClick={() => {
+          setOccupation("");
+          setCompany("");
+          setEditing("new");
+        }}
+      />
 
       {editing && (
         <Modal title={editing === "new" ? "Add job" : "Edit job"} onClose={() => setEditing(null)}>
           <form onSubmit={save} className="space-y-4">
             {error && <SectionError message={error} />}
             <Field
-              id="job_name"
-              label="Job / employer name"
+              id="job_occupation"
+              label="Occupation"
               required
               maxLength={256}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="off"
+              placeholder="e.g. Software developer"
+              value={occupation}
+              onChange={(e) => setOccupation(e.target.value)}
+              autoComplete="organization-title"
+            />
+            <Field
+              id="job_company"
+              label="Company / employer name"
+              required
+              maxLength={256}
+              placeholder="e.g. Greenhills Inc"
+              hint="Must match the employer on your W-2 / payer on your 1099 — we verify the documents against it."
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              autoComplete="organization"
             />
             <FormButtons busy={busy} submitLabel="Save job" onCancel={() => setEditing(null)} />
           </form>

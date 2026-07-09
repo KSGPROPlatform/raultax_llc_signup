@@ -14,6 +14,22 @@ const IDENTITY_DOCS = new Set(["ssn_copy", "spouse_ssn_copy"]);
 
 const digits = (v) => String(v ?? "").replace(/\D/g, "");
 
+// Company/employer comparison: every significant token the user typed must
+// appear in the form's company name (case-insensitive; legal suffixes like
+// Inc/LLC and punctuation are ignored, so "Blue Beacon" matches
+// "BLUE BEACON USA, LP").
+const COMPANY_STOP = new Set([
+  "inc", "llc", "corp", "co", "ltd", "company", "corporation", "lp", "llp", "plc", "the",
+]);
+function companyMatches(expectedCompany, formCompany) {
+  const toks = (s) =>
+    String(s).toLowerCase().split(/[^a-z0-9]+/).filter((t) => t && !COMPANY_STOP.has(t));
+  const exp = toks(expectedCompany);
+  const form = new Set(toks(formCompany));
+  if (!exp.length || !form.size) return false;
+  return exp.every((t) => form.has(t));
+}
+
 // The typed first AND last name must both appear as tokens in the card's name
 // (case-insensitive, any order — tolerates middle names/initials on the card).
 function nameMatches(expectedName, cardName) {
@@ -47,6 +63,20 @@ function gateResult(docType, flat, expected) {
       } else {
         return { reason: "ssn_unreadable" };
       }
+    }
+    // The employee (W-2) / recipient (1099) printed on the form must be the
+    // account holder.
+    if (expected.name) {
+      const formName = String(flat.employee_name ?? flat.recipient_name ?? "").trim();
+      if (!formName) return { reason: "name_unreadable" };
+      if (!nameMatches(expected.name, formName)) return { reason: "name_mismatch" };
+    }
+    // And the employer (W-2) / payer company (1099) must be the company the
+    // user entered on this job (skipped when the job has no company yet).
+    if (expected.company) {
+      const formCompany = String(flat.employer_name ?? flat.company_name ?? "").trim();
+      if (!formCompany) return { reason: "company_unreadable" };
+      if (!companyMatches(expected.company, formCompany)) return { reason: "company_mismatch" };
     }
   }
   if (IDENTITY_DOCS.has(docType)) {
@@ -199,12 +229,24 @@ app.http("analyzeDocument", {
       }
 
       // Gates 2+3: the document read fine — now it must BELONG here. W-2/1099
-      // must carry the declaration's tax year; SSN cards must match the typed
-      // identity (expected values passed server-to-server by the app).
+      // must carry the declaration's tax year and the holder's SSN/name; the
+      // employer/payer must match the job's company; SSN cards must match the
+      // typed identity (expected values passed server-to-server by the app).
+      let jobCompany = "";
+      if (file.job_id != null && YEAR_DOCS.has(file.doc_type)) {
+        const jr = await pool
+          .request()
+          .input("oid", sql.NVarChar(64), oid)
+          .input("jid", sql.Int, file.job_id)
+          .query(`SELECT company_name FROM raul_tax_jobs WHERE id = @jid AND owner_oid = @oid;`)
+          .catch(() => ({ recordset: [] }));
+        jobCompany = (jr.recordset[0] && jr.recordset[0].company_name) || "";
+      }
       const rejection = gateResult(file.doc_type, result.flat || {}, {
         taxYear,
         ssn: request.query.get("expectedSsn") || "",
         name: request.query.get("expectedName") || "",
+        company: jobCompany.trim(),
       });
       if (rejection) return rejectFile(rejection);
 

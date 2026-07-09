@@ -134,8 +134,8 @@ app.http("declarations", {
                     SELECT owner_oid, bank_name, account_number, routing_number, @year
                     FROM raul_tax_bank_accounts WHERE owner_oid = @oid AND tax_year = @src;
 
-                  INSERT INTO raul_tax_jobs (owner_oid, job_name, tax_year)
-                    SELECT owner_oid, job_name, @year
+                  INSERT INTO raul_tax_jobs (owner_oid, job_name, occupation, company_name, tax_year)
+                    SELECT owner_oid, job_name, occupation, company_name, @year
                     FROM raul_tax_jobs WHERE owner_oid = @oid AND tax_year = @src;
 
                   INSERT INTO raul_tax_companies (owner_oid, company_name, ein, activities, business_expense, tax_year)

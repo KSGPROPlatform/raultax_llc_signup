@@ -193,11 +193,18 @@ export const deleteCompanyLine = (oid: string, id: number) =>
 export type Job = {
   id: number;
   owner_oid: string;
-  job_name: string;
+  job_name: string; // legacy combined label; occupation + company_name are canonical
+  occupation: string;
+  company_name: string;
   created_at: string;
   updated_at: string;
 };
-export type JobInput = { id?: number; job_name: string };
+export type JobInput = {
+  id?: number;
+  job_name: string;
+  occupation?: string;
+  company_name?: string;
+};
 export const listJobs = (oid: string, taxYear?: number) =>
   listRows<Job>("jobs", oid, { taxYear });
 export const saveJob = (oid: string, j: JobInput, taxYear?: number) =>

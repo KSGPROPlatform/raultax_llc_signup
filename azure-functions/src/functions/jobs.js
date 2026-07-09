@@ -28,7 +28,8 @@ app.http("jobs", {
           where += " AND tax_year = @year";
         }
         const result = await req.query(`
-            SELECT id, owner_oid, job_name, tax_year, created_at, updated_at
+            SELECT id, owner_oid, job_name, occupation, company_name, tax_year,
+                   created_at, updated_at
             FROM raul_tax_jobs
             WHERE ${where}
             ORDER BY id DESC;
@@ -44,17 +45,21 @@ app.http("jobs", {
           .request()
           .input("oid", sql.NVarChar(64), b.oid)
           .input("job_name", sql.NVarChar(256), b.job_name ?? "")
+          .input("occupation", sql.NVarChar(256), b.occupation ?? "")
+          .input("company_name", sql.NVarChar(256), b.company_name ?? "")
           .input("year", sql.Int, year);
 
         const OUTPUT = `
           OUTPUT inserted.id, inserted.owner_oid, inserted.job_name,
+                 inserted.occupation, inserted.company_name,
                  inserted.tax_year, inserted.created_at, inserted.updated_at`;
 
         if (b.id) {
           // Updates keep the row's original year.
           const result = await req.input("id", sql.Int, Number(b.id)).query(`
             UPDATE raul_tax_jobs
-            SET job_name = @job_name, updated_at = SYSUTCDATETIME()
+            SET job_name = @job_name, occupation = @occupation,
+                company_name = @company_name, updated_at = SYSUTCDATETIME()
             ${OUTPUT}
             WHERE id = @id AND owner_oid = @oid;
           `);
@@ -63,9 +68,9 @@ app.http("jobs", {
         }
 
         const result = await req.query(`
-          INSERT INTO raul_tax_jobs (owner_oid, job_name, tax_year)
+          INSERT INTO raul_tax_jobs (owner_oid, job_name, occupation, company_name, tax_year)
           ${OUTPUT}
-          VALUES (@oid, @job_name, @year);
+          VALUES (@oid, @job_name, @occupation, @company_name, @year);
         `);
         return { status: 201, jsonBody: result.recordset[0] };
       }

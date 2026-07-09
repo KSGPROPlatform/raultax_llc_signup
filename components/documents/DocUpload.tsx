@@ -58,9 +58,13 @@ function rejectMessage(
     case "ssn_unreadable":
       return `We couldn't read the SSN on this ${label} — it may be too blurry. Please upload a clearer copy.`;
     case "name_mismatch":
-      return "The name on this card doesn't match the name on the account.";
+      return `The name on this ${label} doesn't match the name on your account — this doesn't look like your document.`;
     case "name_unreadable":
-      return "We couldn't read the name on this card — please upload a clearer copy.";
+      return `We couldn't read the name on this ${label} — please upload a clearer copy.`;
+    case "company_mismatch":
+      return `The company on this ${label} doesn't match this job's company. Check you're uploading it under the right job.`;
+    case "company_unreadable":
+      return `We couldn't read the company name on this ${label} — please upload a clearer copy.`;
     default:
       return `This doesn't look like ${label}. Please upload the correct document.`;
   }

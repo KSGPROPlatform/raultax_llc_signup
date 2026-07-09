@@ -20,7 +20,12 @@ export async function POST(request: Request) {
   try {
     const row = await saveJob(
       user.sub,
-      { id: body.id, job_name: body.job_name ?? "" },
+      {
+        id: body.id,
+        job_name: body.job_name ?? "",
+        occupation: body.occupation ?? "",
+        company_name: body.company_name ?? "",
+      },
       await activeTaxYear(),
     );
     return NextResponse.json({ row }, { status: body.id ? 200 : 201 });
