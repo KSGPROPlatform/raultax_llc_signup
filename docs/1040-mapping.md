@@ -127,7 +127,44 @@ Part II — Adjustments to income:
 | **Schedule C** (per company) | company with P&L exists | net → `s1_3` | v1: net = P&L net; full expense categories later |
 | **Schedule SE** | Σ business nets ≥ $400 | ½ SE tax → `s1_15`; SE tax → Schedule 2 → 1040 line 23 | to spec with the tax section |
 
+### Line 11a — CLOSED: `line_11a = line_9 − line_10` (AGI). Page 1 complete.
+
+### Tax and Credits (11b–24) — CLOSED (v1 scope)
+| Column | Formula |
+|---|---|
+| `line_11b` | = line_11a |
+| 12a–12d | checkboxes: **age (born before Jan 2 of year−64)** computed from user/spouse DOB; blind, claimed-as-dependent, spouse-itemizes, dual-status → parked (preparer) |
+| `line_12e` | **standard deduction from rules file by filing status** (2025 printed on form: Single/MFS 15,750; MFJ/QSS 31,500; HoH 23,625) **+ age-65 additions per rules file**; itemized (Schedule A) = preparer override |
+| `line_13a` | QBI deduction — **Form 8995 module** (trigger: business net > 0); NULL until specced |
+| `line_13b` | Schedule 1-A additional deductions; NULL |
+| `line_14` | = 12e + 13a + 13b |
+| `line_15` | = max(0, 11b − 14) — taxable income |
+| `line_16` | **tax = bracket table lookup (rules file, per year + filing status)** |
+| `line_17` | Schedule 2 line 3; NULL |
+| `line_18` | = 16 + 17 |
+| `line_19` | CTC/ODC — **Schedule 8812 module**: trigger = dependents; under-17 from DOB; amounts/phase-outs in rules file |
+| `line_20` | Schedule 3 line 8; NULL (receives 2441 line 11, 8839 line 18 when built) |
+| `line_21` | = 19 + 20 |
+| `line_22` | = max(0, 18 − 21) |
+| `line_23` | Schedule 2 line 21 — v1 ≈ **Schedule SE tax** when triggered; rest parked |
+| `line_24` | = 22 + 23 — **total tax** |
+
+**HARD RULE — rules-file integrity:** every non-form-printed constant (bracket
+tables, age-65 additions, CTC amounts/phase-outs, SE caps) must be verified
+against official IRS publications for that tax year AT IMPLEMENTATION TIME —
+never written from memory.
+
+### Sub-form registry additions
+| Form | Trigger | Outputs |
+|---|---|---|
+| **Form 8995** (QBI) | business net > 0 | deduction → `line_13a` |
+| **Schedule 8812** (CTC/ODC) | dependents exist | credit → `line_19` (needs lived-with/support confirmations — v1: DOB-derived + preparer confirm) |
+| **Schedule 2** | any component present | line 3 → `line_17`; line 21 → `line_23` (v1: SE tax) |
+| **Schedule 3** | any component present | line 8 → `line_20` |
+| **Schedule A** (itemized) | preparer-initiated only | alternative to standard deduction |
+
 ## Discussion status
-- 2026-07-09: header + lines 1, 8, 9, 10 closed; lines 2–7 parked as columns;
-  Schedule 1 fully specced. Next: line 11a (AGI = 9 − 10), then page 2
-  (deduction, tax, credits, payments, refund).
+- 2026-07-09: page 1 complete (income spine computable end-to-end); Tax &
+  Credits 11b–24 closed for v1. NEXT: Payments & Refundable Credits (25–33) —
+  incl. line 25a = Σ W-2 box 2 (already extracted) — then Refund/Amount Owed
+  (34–37, bank direct deposit) to finish the form.
