@@ -154,14 +154,74 @@ tables, age-65 additions, CTC amounts/phase-outs, SE caps) must be verified
 against official IRS publications for that tax year AT IMPLEMENTATION TIME —
 never written from memory.
 
-### Sub-form registry additions
-| Form | Trigger | Outputs |
-|---|---|---|
-| **Form 8995** (QBI) | business net > 0 | deduction → `line_13a` |
-| **Schedule 8812** (CTC/ODC) | dependents exist | credit → `line_19` (needs lived-with/support confirmations — v1: DOB-derived + preparer confirm) |
-| **Schedule 2** | any component present | line 3 → `line_17`; line 21 → `line_23` (v1: SE tax) |
-| **Schedule 3** | any component present | line 8 → `line_20` |
-| **Schedule A** (itemized) | preparer-initiated only | alternative to standard deduction |
+### Tax & Credits sub-form specs (extracted from the uploaded 2025 forms —
+### all constants below are PRINTED on the official forms = locked)
+
+**Schedule 8812 → `line_19` (+ `line_28` additional CTC). Trigger: dependents.**
+- 3 = MAGI = 11a + exclusions (2a–2c parked)
+- 4 = # qualifying children under 17 with required SSN (DOB + SSN collected);
+  5 = 4 × **$2,200**
+- 6 = # other dependents (rest; citizen/resident confirm = preparer);
+  7 = 6 × **$500**; 8 = 5 + 7
+- 9 = **$400,000 MFJ / $200,000 others**; 10 = max(0, 3 − 9) rounded UP to
+  next $1,000; 11 = 10 × 5%
+- 12 = 8 − 11 (≤ 0 → stop, no credit); 13 = Credit Limit Worksheet A (tax
+  liability limit); **14 = min(12, 13) → 1040 line 19**
+- Part II-A (refundable ACTC → 1040 line 28): 16a = 12 − 14; 16b = #QC ×
+  **$1,700**; 17 = min(16a,16b); 19 = max(0, earned income − **$2,500**);
+  20 = 19 × 15%; 27 per form flow (3+ children route Part II-B uses W-2
+  boxes 4+6) → `line_28`.
+
+**Schedule 2 → `line_17` (Part I line 3) and `line_23` (Part II line 21).**
+- Part I: 1a–1y parked (1a = 8962 APTC repayment), 1z = Σ; 2 = AMT (6251,
+  preparer); 3 = 1z + 2 → `line_17`.
+- Part II: **4 = Schedule SE tax** (trigger: business net ≥ $400);
+  **6 = Form 8919 line 13** (registered); 5, 8–19 parked;
+  **21 = 4 + (7..16) + 18 + 19 → `line_23`** (v1: SE + 8919 when present).
+
+**Schedule 3 → `line_20` (Part I line 8) and `line_31` (Part II line 15).**
+- Part I: 2 = **2441 line 11**; 6c = **8839 line 18**; 1, 3, 4, 5a/5b,
+  other 6x parked; 7 = Σ(6a–6z); **8 = 1+2+3+4+5a+5b+7 → `line_20`**.
+- Part II: 9–14 parked (9 = 8962; 11 = excess SS — computable later from
+  W-2 boxes 4 across employers); **15 → `line_31`**.
+
+**Form 8995 (QBI simplified) → `line_13a`. Trigger: business net > 0 AND
+taxable income before QBI ≤ $197,300 ($394,600 MFJ).**
+- 2 = Σ business QBI (v1: Schedule C nets); 3 = prior-year carryforward
+  (preparer); 4 = max(0, 2+3); 5 = 4 × 20%
+- 6–9 REIT/PTP parked; 10 = 5 + 9
+- 11 = **taxable income BEFORE QBI** (= 11b − 12e − 13b) ⇒ ORDERING:
+  compute 12e and 13b before 8995, then 14 = 12e+13a+13b, then 15
+- 12 = net capital gain + qualified dividends; 13 = max(0, 11 − 12);
+  14 = 13 × 20%; **15 = min(10, 14) → `line_13a`**
+- Over threshold → 8995-A (SSTB phase-in $197,300–$247,300 /
+  $394,600–$494,600) → FLAG preparer, do not compute.
+
+**Schedule 1-A (Additional Deductions) → `line_13b` (line 38).**
+- Part I: 3 = MAGI = 11b + exclusions (parked → = 11b v1).
+- Part II No-tax-on-TIPS: 4a = qualified tips from **W-2 box 7 (extracted)**
+  — qualified-occupation confirm = preparer; 7 = min(6, **$25,000**);
+  phase-out over **$150,000 ($300,000 MFJ)**: 12 = floor(excess/1000) ×
+  **$100**; 13 = max(0, 7 − 12). Partially computable v1.
+- Part III No-tax-on-OVERTIME: cap **$12,500 ($25,000 MFJ)**, same
+  phase-out — parked (amount not separately collected).
+- Part IV Car-loan interest: cap **$10,000**, phase-out over **$100,000
+  ($200,000 MFJ)**, excess/1000 rounded UP × **$200** — parked.
+- Part V Enhanced SENIOR deduction — **fully computable v1**: per person
+  with valid SSN born before **Jan 2, 1961** (from DOBs): 35 = max(0,
+  **$6,000** − 6% × max(0, MAGI − **$75,000/$150,000 MFJ**)); 37 = 36a+36b.
+- **38 = 13 + 21 + 30 + 37 → `line_13b`.** (MFJ required for tips/OT/senior
+  when married — per form cautions.)
+
+**Schedule A (itemized) → alternative `line_12e`. Preparer-initiated v1.**
+- Medical > 7.5% × 11b; SALT cap **$40,000 ($20,000 MFS)**, drops if 11b >
+  $500k/$250k; mortgage interest from **Form 1098 (doc type 'mortgage'
+  already collected/extractable — future automation)**; charity; 17 = total.
+
+**Computation order (dependency graph):**
+income spine (1z…11a) → 11b → 12a–d age boxes (DOB) → 12e → 13b (Sch 1-A)
+→ 8995 → 13a → 14 → 15 → 16 (brackets) → Sch 2 part I → 17 → 18 → 8812 →
+19 → Sch 3 part I → 20 → 21 → 22 → Sch SE/Sch 2 part II → 23 → 24.
 
 ## Discussion status
 - 2026-07-09: page 1 complete (income spine computable end-to-end); Tax &
