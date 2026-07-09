@@ -16,12 +16,22 @@ import {
 } from "@/components/dashboard/sectionUI";
 
 // Form 3 manager — used both in the dashboard card and the onboarding step.
-export function BankSection() {
+// `onStatusChange` reports whether the step is complete (>= 1 account), so the
+// onboarding stepper can gate its Continue button.
+export function BankSection({
+  onStatusChange,
+}: {
+  onStatusChange?: (done: boolean) => void;
+}) {
   const [rows, setRows] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<BankAccount | "new" | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    onStatusChange?.(rows.length > 0);
+  }, [rows.length, onStatusChange]);
 
   useEffect(() => {
     let active = true;

@@ -6,15 +6,27 @@ import type { Spouse } from "@/lib/profileData";
 import { SpouseForm, type SpouseValues } from "@/components/profile/SpouseForm";
 import { SectionError, SectionSkeleton } from "@/components/dashboard/sectionUI";
 
-// Spouse manager (one per user) — used in the onboarding step and the dashboard.
-// `mode` is decided by the filing status: "full" (Married filing jointly) or
-// "ssn" (Married filing separately).
-export function SpouseSection({ mode }: { mode: "full" | "ssn" }) {
+// Spouse manager (one per user per year) — used in the onboarding step and the
+// dashboard. `mode` is decided by the filing status: "full" (Married filing
+// jointly) or "ssn" (Married filing separately). `onStatusChange` reports
+// whether a spouse record exists, so the stepper can gate its Continue button.
+export function SpouseSection({
+  mode,
+  onStatusChange,
+}: {
+  mode: "full" | "ssn";
+  onStatusChange?: (done: boolean) => void;
+}) {
   const [initial, setInitial] = useState<Partial<SpouseValues> | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [exists, setExists] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onStatusChange?.(exists);
+  }, [exists, onStatusChange]);
 
   useEffect(() => {
     let active = true;
@@ -25,6 +37,7 @@ export function SpouseSection({ mode }: { mode: "full" | "ssn" }) {
           const data = await res.json();
           const s = (data.spouse ?? {}) as Partial<Spouse>;
           if (active) {
+            setExists(Boolean(s.id));
             setInitial({
               first_name: s.first_name ?? "",
               last_name: s.last_name ?? "",
@@ -67,6 +80,7 @@ export function SpouseSection({ mode }: { mode: "full" | "ssn" }) {
       }
       setInitial((prev) => ({ ...prev, ...v }));
       setSaved(true);
+      setExists(true);
     } catch {
       setError("Network error. Please try again.");
     } finally {

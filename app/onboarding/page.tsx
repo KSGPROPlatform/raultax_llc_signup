@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { buttonClass, FormError } from "@/components/auth/AuthShell";
@@ -103,6 +103,25 @@ function OnboardingFlow() {
   const [savingYear, setSavingYear] = useState(false);
   const [startedYears, setStartedYears] = useState<number[]>([]);
   const [hasData, setHasData] = useState<Partial<Record<StepKey, boolean>> | null>(null);
+  // Live completeness of the gated steps (reported by the sections), so
+  // Continue stays disabled until the step's required info is saved.
+  const [sectionDone, setSectionDone] = useState({
+    spouse: false,
+    bank: false,
+    business: false,
+  });
+  const markSpouse = useCallback(
+    (d: boolean) => setSectionDone((s) => ({ ...s, spouse: d })),
+    [],
+  );
+  const markBank = useCallback(
+    (d: boolean) => setSectionDone((s) => ({ ...s, bank: d })),
+    [],
+  );
+  const markBusiness = useCallback(
+    (d: boolean) => setSectionDone((s) => ({ ...s, business: d })),
+    [],
+  );
   const [error, setError] = useState<string | null>(null);
 
   const fs = personal.filing_status ?? "";
@@ -169,17 +188,15 @@ function OnboardingFlow() {
         finish: false,
       };
       setHasData(has);
-      let furthest = -1;
-      localSteps.forEach((k, i) => {
-        if (has[k]) furthest = i;
-      });
-      // The tax year is mandatory and comes first: until a declaration exists,
-      // always land on the year step (even if older data was saved before the
-      // per-year feature). Once declared, resume past the furthest saved step —
-      // EXCEPT when declaring a new year (?new=1), which always starts at the
-      // year step.
-      if (!isNew && has.year && furthest >= 0) {
-        setStep(Math.min(furthest + 1, localSteps.length - 1));
+      setSectionDone({ spouse: has.spouse, bank: has.bank, business: has.business });
+      // Land on the FIRST required step still missing information (dependents
+      // are optional and never a landing target; everything filled -> review/
+      // finish). Declaring a new year (?new=1) always starts at the year step.
+      if (!isNew) {
+        const gap = localSteps.findIndex(
+          (k) => k !== "dependents" && k !== "finish" && !has[k],
+        );
+        setStep(gap >= 0 ? gap : localSteps.length - 1);
       }
       setLoaded(true);
     })();
@@ -199,15 +216,14 @@ function OnboardingFlow() {
     setPersonal(values);
     const localSteps = buildSteps(values.filing_status ?? "");
     // Declaring a new year with everything pre-filled: after confirming the
-    // personal info, jump straight to where the user's progress had reached
+    // personal info, jump straight to the first section still missing info
     // instead of stepping through every already-completed form.
     if (isNew && hasData) {
       const snapshot = { ...hasData, year: true, personal: true };
-      let furthest = -1;
-      localSteps.forEach((k, i) => {
-        if (snapshot[k]) furthest = i;
-      });
-      setStep(Math.min(furthest + 1, localSteps.length - 1));
+      const gap = localSteps.findIndex(
+        (k) => k !== "dependents" && k !== "finish" && !snapshot[k],
+      );
+      setStep(gap >= 0 ? gap : localSteps.length - 1);
       return;
     }
     setStep((s) => Math.min(localSteps.length - 1, s + 1));
@@ -344,11 +360,15 @@ function OnboardingFlow() {
                 />
               </>
             )}
-            {currentKey === "spouse" && <SpouseSection mode={spouseMode} />}
+            {currentKey === "spouse" && (
+              <SpouseSection mode={spouseMode} onStatusChange={markSpouse} />
+            )}
             {currentKey === "dependents" && <DependentsSection />}
-            {currentKey === "bank" && <BankSection />}
+            {currentKey === "bank" && <BankSection onStatusChange={markBank} />}
             {currentKey === "jobs" && <JobsSection />}
-            {currentKey === "business" && <CompaniesSection />}
+            {currentKey === "business" && (
+              <CompaniesSection onStatusChange={markBusiness} />
+            )}
             {currentKey === "finish" && (
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-400">
                 Everything is saved as you go. Click{" "}
@@ -376,8 +396,21 @@ function OnboardingFlow() {
           )}
 
           {/* Nav — the Personal info step uses the form's own submit for
-              "Continue", so the generic footer renders for every other step. */}
+              "Continue", so the generic footer renders for every other step.
+              Required steps gate Continue until their info is saved. */}
           {currentKey !== "personal" && (
+            <>
+              {((currentKey === "spouse" && !sectionDone.spouse) ||
+                (currentKey === "bank" && !sectionDone.bank) ||
+                (currentKey === "business" && !sectionDone.business)) && (
+                <p className="mt-6 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                  {currentKey === "spouse" &&
+                    "Save your spouse's information to continue."}
+                  {currentKey === "bank" && "Add a bank account to continue."}
+                  {currentKey === "business" &&
+                    "Answer the establishment question (and add your company if yes) to continue."}
+                </p>
+              )}
             <div className="mt-8 flex gap-2">
               {safeStep > 0 && (
                 <button
@@ -391,7 +424,13 @@ function OnboardingFlow() {
               {safeStep < last ? (
                 <button
                   type="button"
-                  disabled={savingYear || (currentKey === "year" && taxYear === null)}
+                  disabled={
+                    savingYear ||
+                    (currentKey === "year" && taxYear === null) ||
+                    (currentKey === "spouse" && !sectionDone.spouse) ||
+                    (currentKey === "bank" && !sectionDone.bank) ||
+                    (currentKey === "business" && !sectionDone.business)
+                  }
                   onClick={() =>
                     currentKey === "year"
                       ? saveYear()
@@ -428,6 +467,7 @@ function OnboardingFlow() {
                 </button>
               )}
             </div>
+            </>
           )}
         </div>
           </>

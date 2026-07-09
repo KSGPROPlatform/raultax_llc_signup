@@ -14,9 +14,17 @@ import {
 } from "@/components/dashboard/sectionUI";
 
 // Form 4 manager. Gated by the "do you own an establishment?" answer.
-// `initialOwns` seeds the answer from the session on the dashboard; the
-// onboarding step omits it and infers from existing companies.
-export function CompaniesSection({ initialOwns }: { initialOwns?: boolean }) {
+// `initialOwns` seeds the answer (from the active declaration on the dashboard);
+// the onboarding step omits it and infers from existing companies.
+// `onStatusChange` reports whether the step is complete (answered No, or has a
+// company), so the onboarding stepper can gate its Continue button.
+export function CompaniesSection({
+  initialOwns,
+  onStatusChange,
+}: {
+  initialOwns?: boolean;
+  onStatusChange?: (done: boolean) => void;
+}) {
   const [owns, setOwns] = useState<boolean | null>(
     initialOwns === undefined ? null : initialOwns,
   );
@@ -26,6 +34,10 @@ export function CompaniesSection({ initialOwns }: { initialOwns?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Company | "new" | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    onStatusChange?.(owns === false || rows.length > 0);
+  }, [owns, rows.length, onStatusChange]);
 
   useEffect(() => {
     let active = true;
