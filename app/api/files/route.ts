@@ -5,6 +5,7 @@ import { listFiles, uploadFile, saveDocument, isFilesConfigured } from "@/lib/fi
 import { isKnownDocType, isYearScoped, isIdentityChecked } from "@/lib/docTypes";
 import { resolveExpectedIdentity } from "@/lib/identity";
 import { TAX_YEAR_COOKIE, resolveTaxYear } from "@/lib/taxYear";
+import { revertSubmissionToDraft } from "@/lib/profileData";
 
 const MAX_BYTES = 25 * 1024 * 1024; // 25 MB app-side cap
 
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
     const saved = docType
       ? await saveDocument(user.sub, file.name, contentType, bytes, docType, jobId, taxYear)
       : await uploadFile(user.sub, file.name, contentType, bytes, null, null, taxYear);
+    await revertSubmissionToDraft(user.sub, taxYear);
     return NextResponse.json({ file: saved }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed.";

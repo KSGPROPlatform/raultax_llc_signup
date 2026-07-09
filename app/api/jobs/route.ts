@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listJobs, saveJob } from "@/lib/profileData";
+import { listJobs, saveJob, revertSubmissionToDraft } from "@/lib/profileData";
 import { activeTaxYear } from "@/lib/activeYear";
 
 // GET /api/jobs — the signed-in user's jobs for the active tax year.
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       },
       await activeTaxYear(),
     );
+    await revertSubmissionToDraft(user.sub, await activeTaxYear());
     return NextResponse.json({ row }, { status: body.id ? 200 : 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Save failed.";

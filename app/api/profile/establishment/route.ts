@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { upsertUser } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
-import { createDeclaration } from "@/lib/profileData";
+import { createDeclaration, revertSubmissionToDraft } from "@/lib/profileData";
 import { activeTaxYear } from "@/lib/activeYear";
 
 // POST /api/profile/establishment  { owns: boolean }
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     await createDeclaration(user.sub, await activeTaxYear(), {
       owns_establishment: owns,
     });
+    await revertSubmissionToDraft(user.sub, await activeTaxYear());
   } catch (err) {
     console.error("establishment declaration save failed:", err);
   }

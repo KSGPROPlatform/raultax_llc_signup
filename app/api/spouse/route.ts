@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getSpouse, saveSpouse, type SpouseInput } from "@/lib/profileData";
+import { getSpouse, saveSpouse, revertSubmissionToDraft, type SpouseInput } from "@/lib/profileData";
 import { activeTaxYear } from "@/lib/activeYear";
 import { cardConsistencyError } from "@/lib/identity";
 
@@ -43,6 +43,7 @@ export async function POST(request: Request) {
 
   try {
     const spouse = await saveSpouse(user.sub, data, await activeTaxYear());
+    await revertSubmissionToDraft(user.sub, await activeTaxYear());
     return NextResponse.json({ spouse });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Save failed.";

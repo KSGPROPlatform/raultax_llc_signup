@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listDependents, saveDependent } from "@/lib/profileData";
+import { listDependents, saveDependent, revertSubmissionToDraft } from "@/lib/profileData";
 import { activeTaxYear } from "@/lib/activeYear";
 
 // GET /api/dependents — the signed-in user's dependents for the active tax year.
@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       },
       await activeTaxYear(),
     );
+    await revertSubmissionToDraft(user.sub, await activeTaxYear());
     return NextResponse.json({ row }, { status: body.id ? 200 : 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Save failed.";

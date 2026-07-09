@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listCompanyLines, saveCompanyLine } from "@/lib/profileData";
+import { listCompanyLines, saveCompanyLine, revertSubmissionToDraft } from "@/lib/profileData";
+import { activeTaxYear } from "@/lib/activeYear";
 
 // GET /api/company-lines?companyId= — the signed-in user's P&L lines for a company.
 export async function GET(request: Request) {
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       description: body.description ?? "",
       amount: Number.isFinite(amount) ? Math.abs(amount) : 0,
     });
+    await revertSubmissionToDraft(user.sub, await activeTaxYear());
     return NextResponse.json({ row }, { status: body.id ? 200 : 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Save failed.";

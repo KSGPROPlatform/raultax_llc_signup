@@ -257,6 +257,22 @@ export const createDeclaration = (
   fields?: DeclarationInput,
 ) => saveRow<Declaration>("declarations", oid, { taxYear, ...(fields ?? {}) });
 
+// Post-submit modifications REOPEN the year: any data change (info edited,
+// rows added/removed, documents uploaded/deleted) flips a "submitted"
+// declaration back to draft, so the Submit button reappears and re-submitting
+// recomputes the 1040. No-op unless currently submitted; must never break the
+// data save it follows.
+export async function revertSubmissionToDraft(oid: string, taxYear: number): Promise<void> {
+  try {
+    const rows = await listDeclarations(oid);
+    if (rows.find((d) => d.tax_year === taxYear)?.status === "submitted") {
+      await createDeclaration(oid, taxYear, { status: "draft" });
+    }
+  } catch {
+    // status reset is best-effort — the save it follows already succeeded
+  }
+}
+
 // ---- Spouse (filing-status driven; one per user) ----
 export type Spouse = {
   id: number;

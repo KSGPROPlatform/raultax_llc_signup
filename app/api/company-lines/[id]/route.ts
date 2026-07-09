@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { deleteCompanyLine } from "@/lib/profileData";
+import { deleteCompanyLine, revertSubmissionToDraft } from "@/lib/profileData";
+import { activeTaxYear } from "@/lib/activeYear";
 
 // DELETE /api/company-lines/:id — owner-scoped (recomputes the company's net).
 export async function DELETE(
@@ -16,6 +17,7 @@ export async function DELETE(
   }
   try {
     await deleteCompanyLine(user.sub, n);
+    await revertSubmissionToDraft(user.sub, await activeTaxYear());
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });

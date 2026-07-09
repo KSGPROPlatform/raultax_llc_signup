@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { deleteJob } from "@/lib/profileData";
+import { deleteJob, revertSubmissionToDraft } from "@/lib/profileData";
+import { activeTaxYear } from "@/lib/activeYear";
 
 // DELETE /api/jobs/:id — owner-scoped (also detaches the job's files).
 export async function DELETE(
@@ -16,6 +17,7 @@ export async function DELETE(
   }
   try {
     await deleteJob(user.sub, n);
+    await revertSubmissionToDraft(user.sub, await activeTaxYear());
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });

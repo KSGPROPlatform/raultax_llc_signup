@@ -3,7 +3,7 @@ import { getSession } from "@/lib/auth";
 import { upsertUser, type Profile } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 import type { PersonalInfoValues } from "@/components/profile/PersonalInfoForm";
-import { getUserProfile, listDeclarations, createDeclaration } from "@/lib/profileData";
+import { getUserProfile, listDeclarations, createDeclaration, revertSubmissionToDraft } from "@/lib/profileData";
 import { activeTaxYear } from "@/lib/activeYear";
 import { cardConsistencyError } from "@/lib/identity";
 
@@ -98,6 +98,7 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("declaration personal save failed:", err);
   }
+  await revertSubmissionToDraft(user.sub, await activeTaxYear());
   // Keep the user's current onboardingComplete — completing Personal info alone
   // does not finish the journey.
   const updated = {

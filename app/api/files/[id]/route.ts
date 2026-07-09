@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { viewFile, deleteFile } from "@/lib/files";
+import { revertSubmissionToDraft } from "@/lib/profileData";
+import { activeTaxYear } from "@/lib/activeYear";
 
 // GET /api/files/:id        -> serves the file INLINE (preview)
 // GET /api/files/:id?download=1 -> serves it as an ATTACHMENT (download)
@@ -51,6 +53,7 @@ export async function DELETE(
 
   try {
     await deleteFile(user.sub, fileId);
+    await revertSubmissionToDraft(user.sub, await activeTaxYear());
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });

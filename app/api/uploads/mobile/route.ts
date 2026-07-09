@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { verifyUploadToken } from "@/lib/uploadToken";
 import { listFiles, saveDocument, uploadFile, isFilesConfigured } from "@/lib/files";
+import { revertSubmissionToDraft } from "@/lib/profileData";
+import { allowedTaxYears } from "@/lib/taxYear";
 import { isKnownDocType } from "@/lib/docTypes";
 
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -57,6 +59,8 @@ export async function POST(request: Request) {
     const saved = docType
       ? await saveDocument(auth.oid, file.name, contentType, bytes, docType, jobId, taxYear)
       : await uploadFile(auth.oid, file.name, contentType, bytes, null, null, taxYear);
+    // Mirror uploadFile's fallback: no token year -> latest declarable year.
+    await revertSubmissionToDraft(auth.oid, taxYear ?? allowedTaxYears()[0]);
     return NextResponse.json({ file: saved }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed.";
