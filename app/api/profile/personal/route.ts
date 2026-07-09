@@ -5,6 +5,7 @@ import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/sess
 import type { PersonalInfoValues } from "@/components/profile/PersonalInfoForm";
 import { getUserProfile, listDeclarations, createDeclaration } from "@/lib/profileData";
 import { activeTaxYear } from "@/lib/activeYear";
+import { cardConsistencyError } from "@/lib/identity";
 
 // GET /api/profile/personal — the user's saved personal info for the ACTIVE
 // declaration year. Identity (name, DOB, SSN, phone) comes from the profile;
@@ -53,6 +54,15 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const v = (await request.json().catch(() => ({}))) as Partial<PersonalInfoValues>;
+
+  // Save-time guard: the SSN/name being saved must match the verified SSN card
+  // already on file (the card was checked against the TYPED values at upload;
+  // this stops the field being changed afterwards).
+  const conflict = await cardConsistencyError(user.sub, "ssn_copy", {
+    name: [v.first_name, v.last_name].filter(Boolean).join(" "),
+    ssn: v.ssn,
+  });
+  if (conflict) return NextResponse.json({ error: conflict }, { status: 400 });
 
   const profile: Profile = {
     first_name: v.first_name,

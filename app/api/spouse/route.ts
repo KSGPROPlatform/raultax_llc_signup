@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getSpouse, saveSpouse, type SpouseInput } from "@/lib/profileData";
 import { activeTaxYear } from "@/lib/activeYear";
+import { cardConsistencyError } from "@/lib/identity";
 
 // GET /api/spouse — the signed-in user's spouse for the active tax year (or null).
 export async function GET() {
@@ -32,6 +33,14 @@ export async function POST(request: Request) {
   for (const f of FIELDS) {
     if (typeof body[f] === "string") data[f] = body[f] as string;
   }
+  // Save-time guard: the spouse identity being saved must match the verified
+  // spouse SSN card already on file.
+  const conflict = await cardConsistencyError(user.sub, "spouse_ssn_copy", {
+    name: [data.first_name, data.last_name].filter(Boolean).join(" "),
+    ssn: data.ssn,
+  });
+  if (conflict) return NextResponse.json({ error: conflict }, { status: 400 });
+
   try {
     const spouse = await saveSpouse(user.sub, data, await activeTaxYear());
     return NextResponse.json({ spouse });
