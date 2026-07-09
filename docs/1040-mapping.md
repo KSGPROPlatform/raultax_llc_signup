@@ -332,3 +332,24 @@ Forms to upload at v2 start: Schedule B, Schedule EIC, Form 8863, full Sch C.
   (snapshot loader + engine + upsert + overrides/freeze) → preparer review
   page (admin) → user review + submit gate. Rules for 2022–2024: add when
   verified (engine refuses them until then).
+- 2026-07-09 (filled OFFICIAL PDF — v2 item pulled forward): **DONE** —
+  the download IS the IRS's own fillable f1040.pdf (2025 revision) with our
+  values written into its AcroForm fields, then flattened.
+  - `lib/pdf/f1040-2025-b64.ts`: pristine official PDF, base64-embedded
+    (one template per year; other years 404 until their template + rules
+    are verified).
+  - `lib/pdf/fill1040.ts`: field map (built by stamping every field with its
+    own name and reading the render): amounts `line_1a→f1_47 … line_38→f2_36`;
+    filing status = checkbox group `c1_8` exports 1=Single 2=MFJ 3=MFS 4=HOH
+    (Single/MFJ/MFS under `Checkbox_ReadOrder[0]`, HOH under `Page1[0]`);
+    senior boxes `c2_5` (you) / `c2_7` (spouse); dependents rows
+    f1_31–46 + CTC/ODC boxes c1_28–31 (split mirrors engine line 19);
+    SSN/routing/account are comb fields (f1_16, f1_19, f1_39–42, f2_32,
+    f2_33) — pdf-lib can't comb-space, so digits are DRAWN one per cell.
+    Overrides win (same eff() as the review panel); NULL lines stay blank;
+    direct deposit only when line 34 > 0; diagonal "DRAFT — PENDING
+    PREPARER REVIEW" watermark until frozen.
+  - `app/api/tax-return/pdf/route.ts` (session-gated, recomputes first,
+    frozen respected) + "Download IRS Form 1040" button on
+    /dashboard/return. Visually verified on MFJ-draft and MFS-approved
+    renders.

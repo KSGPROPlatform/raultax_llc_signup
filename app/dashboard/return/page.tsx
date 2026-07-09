@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock, FileDown } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { activeTaxYear } from "@/lib/activeYear";
 import { isAllowedTaxYear } from "@/lib/taxYear";
@@ -14,6 +14,7 @@ import {
 import { maskTail } from "@/components/profile/mask";
 import { FORM_1040_SECTIONS, FORM_1040_STRONG } from "@/lib/form1040Lines";
 import { PrintButton } from "@/components/dashboard/PrintButton";
+import { hasF1040Template } from "@/lib/pdf/fill1040";
 
 // The user's FILLED Form 1040 for one tax year — their identity, dependents and
 // every computed line (preparer overrides applied as the final values). Visible
@@ -81,7 +82,19 @@ export default async function ReturnPage({
         >
           <ArrowLeft className="h-4 w-4" /> Back to dashboard
         </Link>
-        {row && <PrintButton />}
+        {row && (
+          <div className="flex items-center gap-2">
+            {hasF1040Template(year) && (
+              <a
+                href={`/api/tax-return/pdf?year=${year}`}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400"
+              >
+                <FileDown className="h-4 w-4" /> Download IRS Form 1040
+              </a>
+            )}
+            <PrintButton />
+          </div>
+        )}
       </div>
 
       {!row ? (
