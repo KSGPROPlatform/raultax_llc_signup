@@ -47,6 +47,16 @@ app.http("deleteFile", {
           DELETE FROM ${cfg.filesTable} WHERE id = @id AND owner_oid = @oid;
         `);
 
+      // raultax: the extracted data must not outlive the document (and orphaned
+      // extraction rows would otherwise pollute the 1040 sums).
+      if (appId === "raultax") {
+        await pool
+          .request()
+          .input("id", sql.Int, id)
+          .query(`DELETE FROM raul_tax_file_extractions WHERE file_id = @id;`)
+          .catch(() => {});
+      }
+
       return { status: 200, jsonBody: { ok: true } };
     } catch (err) {
       context.error("deleteFile failed", err);
