@@ -271,9 +271,33 @@ From the 1040 INSTRUCTIONS at build time (VERIFY rule): tax bracket tables
 (line 16), additional std deduction 65+/blind, 8812 Credit Limit Worksheet A,
 EIC tables.
 
+## Version roadmap (agreed with Doane, 2026-07-09)
+
+**V1 — the common return, end to end** (W-2 earners + small business,
+standard deduction):
+1. Schema: raul_tax_form_1040 + schedule tables (all agreed columns).
+2. Rules files 2022–2025 (constants VERIFIED against IRS at build time).
+3. calc1040 per-line engine: 1a/1z → Sch1/business → 9 → 11a/11b →
+   12e (+age boxes) + Sch1-A senior (+tips partial) + 8995 QBI → 15 →
+   16 (brackets) → 8812 CTC → Sch SE → 24 → 25a/25b/25d → 33 → 34/37 +
+   direct deposit; flags everywhere else.
+4. Gates: W-2 box1/box2 required at upload; Submit completeness gate.
+5. Inputs added: bank Checking/Savings (35c); estimated payments (26).
+6. Preparer review page (admin, per year): computed + sources + flags +
+   overrides; freeze on approve; user sees numbers only after approval.
+7. Golden test suite of hand-computed returns.
+
+**V2**: lines 2/3 via 1099-INT/DIV + Schedule B; EIC; 8863; full 2441/8839/
+8919 modules; dependent checkboxes; digital assets Q; Schedule C categories;
+1099-NEC→Sch C; filled-1040 PDF from the frozen row; user refund reveal.
+
+**V3**: Sch D/8949, Sch E, Sch F; Schedule A automation via 1098 extraction;
+AMT/8959/8960/8995-A; cross-year carryforwards (QBI losses, adoption credit);
+yearly rules-file onboarding process.
+
+Forms to upload at v2 start: Schedule B, Schedule EIC, Form 8863, full Sch C.
+
 ## Discussion status
-- 2026-07-09: **complete — every 1040 line mapped** (computable v1 / module /
-  parked-with-column). Awaiting Schedule SE upload to spec the SE module.
-  Next milestone: implement — SQL (1040 + schedule tables), rules files
-  (2022–2025, constants VERIFIED at build time), calc1040 function with
-  per-line functions, review page (preparer-first).
+- 2026-07-09: **complete — every 1040 line mapped**; roadmap agreed.
+  Awaiting Schedule SE upload (last v1 form) → then implementation begins
+  with the schema SQL.
