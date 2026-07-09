@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { analyzeDocument, getExtraction } from "@/lib/files";
-import { isIdentityChecked } from "@/lib/docTypes";
+import { isIdentityChecked, isYearScoped } from "@/lib/docTypes";
 import { resolveExpectedIdentity } from "@/lib/identity";
 
 // POST /api/files/:id/analyze — run Document Intelligence over the file and store
@@ -26,8 +26,13 @@ export async function POST(
     expectedName?: string;
     expectedSsn?: string;
   };
+  // SSN cards are matched against the typed identity; W-2/1099 must carry the
+  // account holder's SSN (last-4 match — forms usually mask the rest).
   let expected: { name?: string; ssn?: string } | undefined;
-  if (typeof body.docType === "string" && isIdentityChecked(body.docType)) {
+  if (
+    typeof body.docType === "string" &&
+    (isIdentityChecked(body.docType) || isYearScoped(body.docType))
+  ) {
     expected = await resolveExpectedIdentity(user.sub, body.docType, {
       name: body.expectedName ?? null,
       ssn: body.expectedSsn ?? null,

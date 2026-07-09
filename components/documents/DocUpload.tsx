@@ -54,7 +54,9 @@ function rejectMessage(
     case "year_unreadable":
       return `We couldn't read the year on this ${label} — it may be too blurry. Please upload a clearer copy.`;
     case "ssn_mismatch":
-      return "The SSN on this card doesn't match the SSN you entered.";
+      return `The SSN on this ${label} doesn't match the SSN on your account — this doesn't look like your document.`;
+    case "ssn_unreadable":
+      return `We couldn't read the SSN on this ${label} — it may be too blurry. Please upload a clearer copy.`;
     case "name_mismatch":
       return "The name on this card doesn't match the name on the account.";
     case "name_unreadable":
