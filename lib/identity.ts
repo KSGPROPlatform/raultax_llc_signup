@@ -6,6 +6,9 @@ import { activeTaxYear } from "./activeYear";
 // TEMP: only used by the disabled SSN cross-check below — restore with it.
 // const digitsOf = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 
+// TEMP kill-switch (Doane, 2026-07-09): card-vs-typed identity guard off.
+const CARD_GUARD_ENABLED = false as boolean;
+
 // The typed first AND last name must both appear as tokens in the card's name
 // (case-insensitive, any order — tolerates middle names/initials on the card).
 function nameMatches(expectedName: string, cardName: string): boolean {
@@ -52,6 +55,10 @@ export async function cardConsistencyError(
   docType: "ssn_copy" | "spouse_ssn_copy",
   saving: { name?: string; ssn?: string },
 ): Promise<string | null> {
+  // TEMP DISABLED per Doane (2026-07-09): SSN + name cross-checks are off for
+  // now — flip CARD_GUARD_ENABLED back to true (and uncomment the SSN block
+  // below) to restore the guard.
+  if (!CARD_GUARD_ENABLED) return null;
   try {
     const files = await listFiles(oid);
     const card = files.find((f) => f.doc_type === docType);

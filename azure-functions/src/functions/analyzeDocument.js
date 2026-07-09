@@ -67,11 +67,12 @@ function gateResult(docType, flat, expected) {
     // }
     // The employee (W-2) / recipient (1099) printed on the form must be the
     // account holder.
-    if (expected.name) {
-      const formName = String(flat.employee_name ?? flat.recipient_name ?? "").trim();
-      if (!formName) return { reason: "name_unreadable" };
-      if (!nameMatches(expected.name, formName)) return { reason: "name_mismatch" };
-    }
+    // TEMP DISABLED per Doane (2026-07-09) — re-enable by uncommenting.
+    // if (expected.name) {
+    //   const formName = String(flat.employee_name ?? flat.recipient_name ?? "").trim();
+    //   if (!formName) return { reason: "name_unreadable" };
+    //   if (!nameMatches(expected.name, formName)) return { reason: "name_mismatch" };
+    // }
     // And the employer (W-2) / payer company (1099) must be the company the
     // user entered on this job (skipped when the job has no company yet).
     if (expected.company) {
@@ -81,14 +82,15 @@ function gateResult(docType, flat, expected) {
     }
   }
   if (IDENTITY_DOCS.has(docType)) {
-    // TEMP DISABLED per Doane (2026-07-09) — re-enable by uncommenting.
+    // TEMP DISABLED per Doane (2026-07-09) — SSN and name cross-checks both
+    // off for now; re-enable by uncommenting.
     // if (expected.ssn && digits(flat.ssn) !== digits(expected.ssn)) {
     //   return { reason: "ssn_mismatch" };
     // }
-    if (expected.name) {
-      if (!String(flat.name ?? "").trim()) return { reason: "name_unreadable" };
-      if (!nameMatches(expected.name, flat.name)) return { reason: "name_mismatch" };
-    }
+    // if (expected.name) {
+    //   if (!String(flat.name ?? "").trim()) return { reason: "name_unreadable" };
+    //   if (!nameMatches(expected.name, flat.name)) return { reason: "name_mismatch" };
+    // }
   }
   return null;
 }
