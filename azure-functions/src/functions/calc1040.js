@@ -4,17 +4,28 @@ const { computeAll } = require("../taxEngine");
 
 // /api/calc1040 — compute a declaration's Form 1040 from its verified data and
 // store every line (raul_tax_form_1040 / _schedule1 / _schedule_se).
-//   GET  ?oid=&taxYear=   -> the stored 1040 row (+ schedules), or null
-//   POST ?oid=&taxYear=   -> load snapshot -> taxEngine.computeAll -> upsert ->
+//   GET   ?oid=&taxYear=  -> the stored 1040 row (+ flags/overrides), or null
+//   POST  ?oid=&taxYear=  -> load snapshot -> taxEngine.computeAll -> upsert ->
 //                            return { f1040, s1, se, flags }. Refuses when the
 //                            row is FROZEN (preparer approved) — returns stored.
+//   PATCH ?oid=&taxYear=  -> preparer review actions:
+//                            { overrides: { line_x: value|null, ... }, by, frozen }
+//                            null removes an override; frozen true/false toggles
+//                            the freeze. Overrides never touch computed values.
 // Overrides (JSON on the 1040 row) are returned as-is; applying them is the
 // review UI's job so computed values stay pure.
 
 const SAFE_COL = /^(line|s1|se)_[0-9a-z]+$/;
 
 function parseJson(s, fallback) {
-  try { return JSON.parse(s); } catch { return fallback; }
+  if (s === null || s === undefined) return fallback;
+  try {
+    const v = JSON.parse(s);
+    // JSON.parse(null) returns null WITHOUT throwing — treat as missing.
+    return v === null || v === undefined ? fallback : v;
+  } catch {
+    return fallback;
+  }
 }
 
 // Map a stored W-2 extraction's promoted/model fields to engine inputs.
@@ -133,7 +144,7 @@ async function upsertComputed(pool, table, oid, taxYear, values, flagsJson) {
 }
 
 app.http("calc1040", {
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "PATCH"],
   authLevel: "function",
   route: "calc1040",
   handler: async (request, context) => {
@@ -155,6 +166,47 @@ app.http("calc1040", {
         row.flags = parseJson(row.flags, []);
         row.overrides = parseJson(row.overrides, {});
         return { status: 200, jsonBody: row };
+      }
+
+      if (request.method === "PATCH") {
+        const b = (await request.json().catch(() => ({}))) || {};
+        const row = (await pool.request()
+          .input("oid", sql.NVarChar(64), oid)
+          .input("year", sql.Int, taxYear)
+          .query(`SELECT overrides FROM raul_tax_form_1040 WHERE owner_oid = @oid AND tax_year = @year;`))
+          .recordset[0];
+        if (!row) return { status: 404, jsonBody: { error: "No computed return for that year" } };
+
+        const overrides = parseJson(row.overrides, {});
+        if (b.overrides && typeof b.overrides === "object") {
+          for (const [k, v] of Object.entries(b.overrides)) {
+            if (!SAFE_COL.test(k)) continue;
+            if (v === null) {
+              delete overrides[k];
+            } else {
+              const value = Number(typeof v === "object" ? v.value : v);
+              if (Number.isFinite(value)) {
+                overrides[k] = {
+                  value,
+                  by: String(b.by || "admin").slice(0, 128),
+                  at: new Date().toISOString(),
+                };
+              }
+            }
+          }
+        }
+        const frozenBit = typeof b.frozen === "boolean" ? (b.frozen ? 1 : 0) : null;
+        await pool.request()
+          .input("oid", sql.NVarChar(64), oid)
+          .input("year", sql.Int, taxYear)
+          .input("ov", sql.NVarChar(sql.MAX), JSON.stringify(overrides))
+          .input("frozen", sql.Bit, frozenBit).query(`
+            UPDATE raul_tax_form_1040
+            SET overrides = @ov, frozen = COALESCE(@frozen, frozen),
+                updated_at = SYSUTCDATETIME()
+            WHERE owner_oid = @oid AND tax_year = @year;
+          `);
+        return { status: 200, jsonBody: { ok: true, overrides, frozen: frozenBit === null ? undefined : Boolean(frozenBit) } };
       }
 
       // POST — recompute (unless frozen).

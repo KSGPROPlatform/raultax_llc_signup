@@ -23,6 +23,7 @@ import { RoleBadge } from "@/components/dashboard/RoleBadge";
 import { maskTail } from "@/components/profile/mask";
 import { docTypeLabel } from "@/lib/docTypes";
 import type { AdminUserRow, AdminUserDetail } from "@/lib/admin";
+import { TaxReturnReview } from "@/components/dashboard/TaxReturnReview";
 
 function fmtDate(v: string | null) {
   if (!v) return "—";
@@ -274,6 +275,10 @@ function UserDetailModal({ oid, onClose }: { oid: string; onClose: () => void })
             <p className="py-12 text-center text-sm text-zinc-500">Could not load this user.</p>
           ) : (
             <div className="space-y-6">
+              <Section title="Tax return (Form 1040)">
+                <TaxReturnReview oid={oid} />
+              </Section>
+
               <Section title="Profile">
                 <div className="grid gap-x-8 sm:grid-cols-2">
                   <Row label="Email" value={u.email} />

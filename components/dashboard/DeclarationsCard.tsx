@@ -21,6 +21,9 @@ export function DeclarationsCard() {
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [busyYear, setBusyYear] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Per-year result for submitted declarations: numbers appear only once the
+  // preparer approves (status "approved"), else "in_review".
+  const [results, setResults] = useState<Record<number, { status: string; refund?: number | null; owed?: number | null }>>({});
 
   useEffect(() => {
     let active = true;
@@ -29,8 +32,23 @@ export function DeclarationsCard() {
         const res = await fetch("/api/declarations");
         const d = res.ok ? await res.json() : {};
         if (!active) return;
-        setDecls(Array.isArray(d.rows) ? (d.rows as Declaration[]) : []);
+        const rows = Array.isArray(d.rows) ? (d.rows as Declaration[]) : [];
+        setDecls(rows);
         setActiveYear(typeof d.selectedYear === "number" ? d.selectedYear : null);
+        // Fetch the review status/result for submitted years.
+        const submitted = rows.filter((r) => r.status === "submitted");
+        const entries = await Promise.all(
+          submitted.map(async (r) => {
+            try {
+              const t = await fetch(`/api/tax-return?year=${r.tax_year}`);
+              const j = t.ok ? await t.json() : {};
+              return [r.tax_year, { status: j.status ?? "none", refund: j.refund, owed: j.owed }] as const;
+            } catch {
+              return [r.tax_year, { status: "none" }] as const;
+            }
+          }),
+        );
+        if (active) setResults(Object.fromEntries(entries));
       } catch {
         if (active) setDecls([]);
       }
@@ -207,8 +225,21 @@ export function DeclarationsCard() {
                 </div>
               </div>
               {submitted ? (
-                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-                  <CheckCircle2 className="h-4 w-4" /> Submitted
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-sm font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                    <CheckCircle2 className="h-4 w-4" /> Submitted
+                  </span>
+                  {results[r.tax_year]?.status === "approved" ? (
+                    <span className="text-xs font-semibold tabular-nums text-zinc-900 dark:text-zinc-50">
+                      {(results[r.tax_year]?.refund ?? 0) > 0
+                        ? `Refund $${Number(results[r.tax_year]?.refund).toLocaleString()}`
+                        : (results[r.tax_year]?.owed ?? 0) > 0
+                          ? `You owe $${Number(results[r.tax_year]?.owed).toLocaleString()}`
+                          : "Balanced — $0"}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-zinc-400">Awaiting preparer review</span>
+                  )}
                 </span>
               ) : (
                 <div className="flex shrink-0 items-center gap-2">

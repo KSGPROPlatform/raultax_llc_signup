@@ -54,3 +54,25 @@ export async function computeTaxReturn(oid: string, taxYear: number): Promise<Ta
     return null;
   }
 }
+
+// Preparer review actions: per-line overrides (null removes) and freeze toggle.
+export async function patchTaxReturn(
+  oid: string,
+  taxYear: number,
+  body: { overrides?: Record<string, number | null>; frozen?: boolean; by?: string },
+): Promise<TaxReturnRow | null> {
+  if (!base) return null;
+  try {
+    const res = await fetch(fnUrl("calc1040", { oid, taxYear }), {
+      method: "PATCH",
+      headers: { ...APP_HEADERS, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as TaxReturnRow;
+  } catch (err) {
+    console.error("patchTaxReturn failed:", err);
+    return null;
+  }
+}
