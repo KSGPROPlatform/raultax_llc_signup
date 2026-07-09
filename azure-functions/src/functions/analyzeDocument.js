@@ -178,7 +178,7 @@ app.http("analyzeDocument", {
         .request()
         .input("oid", sql.NVarChar(64), oid)
         .input("fid", sql.Int, fileId).query(`
-          SELECT id, blob_name, content_type, doc_type, is_compressed, tax_year
+          SELECT id, blob_name, content_type, doc_type, is_compressed, tax_year, job_id
           FROM ${cfg.filesTable}
           WHERE id = @fid AND owner_oid = @oid;
         `);
