@@ -94,17 +94,40 @@ Create the amount columns now, all NULL; formulas agreed later. Checkbox items
 | `line_6a`, `line_6b` | social security benefits / taxable amount |
 | `line_7a` | capital gain/(loss) — negatives allowed (Schedule D — likely preparer/flag) |
 
-### Line 8 — NEXT, under discussion (business income lands here)
-1040 line 8 = **Schedule 1, line 10**. Proposal on the table:
-- Schedule 1 line 3 (business income) = **Σ per-company P&L nets** for the year
-  (each company = one Schedule C; v1: Schedule C net = our P&L net, preparer
-  override for anything beyond simple income/expense lines).
-- Other Schedule 1 lines: parked columns in the Schedule 1 module.
-- Schedule 1 line 10 = sum of its Part I → 1040 `line_8`. Negatives allowed.
-- Side effect for later: business net ≥ $400 triggers **Schedule SE**
-  (self-employment tax → Schedule 2 → 1040 line 23).
+### Line 8 — CLOSED: `line_8 = Schedule 1 line 10`
+### Line 9 — CLOSED: `line_9 = 1z + 2b + 3b + 4b + 5b + 6b + 7a + 8` (NULL=0) — total income
+### Line 10 — CLOSED: `line_10 = Schedule 1 line 26` (adjustments)
+
+## Schedule 1 module — `raul_tax_schedule1` (one row per declaration; same pattern)
+Sub-form tables mirror the 1040 table: (owner_oid, tax_year) unique, DECIMAL
+columns, NULL semantics, per-line functions inside calc1040.
+
+Part I — Additional income:
+- top box (1099-K in error / personal items at a loss): parked; note 1099-K
+  extractions as a future source.
+- `s1_1`, `s1_2a`, `s1_4`, `s1_5`, `s1_6`, `s1_7`: columns only, NULL.
+  (5 → Schedule E, 6 → Schedule F when ever needed — preparer/flag for now.)
+- **`s1_3` = Σ per-company P&L nets for the year** — each company = one
+  Schedule C; v1: Schedule C net = our P&L net (categories later); losses are
+  negative; owns_establishment = No → no companies → NULL/0.
+- `s1_8a` … `s1_8z`: columns only, NULL (8a/8d/8s enter as negatives when used).
+- `s1_9` = Σ(8a…8z), NULL=0.
+- **`s1_10` = (1 + 2a + 3 + 4 + 5 + 6 + 7) + 9 → 1040 `line_8`.**
+
+Part II — Adjustments to income:
+- `s1_11`–`s1_14`, `s1_16`–`s1_23`, `s1_24a`–`s1_24z`: columns only, NULL.
+- **`s1_15` = deductible ½ of self-employment tax** — from **Schedule SE**
+  (module to spec; triggers when total business net ≥ $400).
+- `s1_25` = Σ(24a…24z); **`s1_26` = Σ(11…23) + 25 → 1040 `line_10`.**
+
+### Sub-form registry additions
+| Form | Trigger | Outputs | Notes |
+|---|---|---|---|
+| **Schedule 1** | always computed (cheap; mostly NULLs) | line 10 → 1040 `line_8`; line 26 → 1040 `line_10` | table `raul_tax_schedule1` |
+| **Schedule C** (per company) | company with P&L exists | net → `s1_3` | v1: net = P&L net; full expense categories later |
+| **Schedule SE** | Σ business nets ≥ $400 | ½ SE tax → `s1_15`; SE tax → Schedule 2 → 1040 line 23 | to spec with the tax section |
 
 ## Discussion status
-- 2026-07-09: header block + line 1 closed; lines 2–7 parked as columns.
-  Discussing line 8 (Schedule 1 / business income). Then 9 (total income),
-  10 (adjustments), 11 (AGI).
+- 2026-07-09: header + lines 1, 8, 9, 10 closed; lines 2–7 parked as columns;
+  Schedule 1 fully specced. Next: line 11a (AGI = 9 − 10), then page 2
+  (deduction, tax, credits, payments, refund).
