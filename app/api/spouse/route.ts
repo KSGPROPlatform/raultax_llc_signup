@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getSpouse, saveSpouse, revertSubmissionToDraft, type SpouseInput } from "@/lib/profileData";
+import { validateSpouseInput } from "@/lib/serverValidate";
 import { activeTaxYear } from "@/lib/activeYear";
 import { cardConsistencyError } from "@/lib/identity";
 
@@ -13,26 +14,15 @@ export async function GET() {
 }
 
 // POST /api/spouse — upsert the spouse. Only the fields present in the body are
-// forwarded, so the MFS "SSN only" save doesn't clear a previously-saved record.
-const FIELDS: (keyof SpouseInput)[] = [
-  "first_name",
-  "last_name",
-  "date_of_birth",
-  "ssn",
-  "street_address",
-  "city",
-  "state_province",
-  "postal_code",
-];
-
+// forwarded (so the MFS "SSN only" save doesn't clear a previously-saved
+// record), and every present field is validated server-side.
 export async function POST(request: Request) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const data: SpouseInput = {};
-  for (const f of FIELDS) {
-    if (typeof body[f] === "string") data[f] = body[f] as string;
-  }
+  const checked = validateSpouseInput(body);
+  if (checked.error) return NextResponse.json({ error: checked.error }, { status: 400 });
+  const data: SpouseInput = checked.data!;
   // Save-time guard: the spouse identity being saved must match the verified
   // spouse SSN card already on file.
   const conflict = await cardConsistencyError(user.sub, "spouse_ssn_copy", {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import * as na from "@/lib/nativeAuth";
+import { validateEmail } from "@/lib/validation";
 import { upsertUser } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 
@@ -11,6 +12,8 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const { email, password } = body;
+  const emailErr = email ? validateEmail(String(email)) : null;
+  if (emailErr) return NextResponse.json({ error: emailErr }, { status: 400 });
   if (!email || !password) {
     return NextResponse.json(
       { error: "Email and password are required." },

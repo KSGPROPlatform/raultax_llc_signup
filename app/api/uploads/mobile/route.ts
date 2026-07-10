@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { verifyUploadToken } from "@/lib/uploadToken";
 import { listFiles, saveDocument, uploadFile, isFilesConfigured } from "@/lib/files";
 import { revertSubmissionToDraft } from "@/lib/profileData";
+import { cleanFilename } from "@/lib/serverValidate";
 import { allowedTaxYears } from "@/lib/taxYear";
 import { isKnownDocType } from "@/lib/docTypes";
 
@@ -56,9 +57,10 @@ export async function POST(request: Request) {
 
     const bytes = await file.arrayBuffer();
     const contentType = file.type || "application/octet-stream";
+    const fname = cleanFilename(file.name);
     const saved = docType
-      ? await saveDocument(auth.oid, file.name, contentType, bytes, docType, jobId, taxYear)
-      : await uploadFile(auth.oid, file.name, contentType, bytes, null, null, taxYear);
+      ? await saveDocument(auth.oid, fname, contentType, bytes, docType, jobId, taxYear)
+      : await uploadFile(auth.oid, fname, contentType, bytes, null, null, taxYear);
     // Mirror uploadFile's fallback: no token year -> latest declarable year.
     await revertSubmissionToDraft(auth.oid, taxYear ?? allowedTaxYears()[0]);
     return NextResponse.json({ file: saved }, { status: 201 });

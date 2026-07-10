@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { listBankAccounts, saveBankAccount, revertSubmissionToDraft } from "@/lib/profileData";
+import { validateBankAccountInput, optionalId } from "@/lib/serverValidate";
 import { activeTaxYear } from "@/lib/activeYear";
 
 // GET /api/bank-accounts — the signed-in user's bank accounts for the active tax year.
@@ -17,15 +18,13 @@ export async function POST(request: Request) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => ({}));
+  const idCheck = optionalId(body.id);
+  const checked = idCheck.error ? { error: idCheck.error } : validateBankAccountInput(body);
+  if (checked.error) return NextResponse.json({ error: checked.error }, { status: 400 });
   try {
     const row = await saveBankAccount(
       user.sub,
-      {
-        id: body.id,
-        bank_name: body.bank_name ?? "",
-        account_number: body.account_number ?? "",
-        routing_number: body.routing_number ?? "",
-      },
+      { id: idCheck.id, ...checked.data! },
       await activeTaxYear(),
     );
     await revertSubmissionToDraft(user.sub, await activeTaxYear());

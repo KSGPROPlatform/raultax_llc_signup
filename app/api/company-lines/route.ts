@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { listCompanyLines, saveCompanyLine, revertSubmissionToDraft } from "@/lib/profileData";
+import { validateCompanyLineInput, optionalId } from "@/lib/serverValidate";
 import { activeTaxYear } from "@/lib/activeYear";
 
 // GET /api/company-lines?companyId= — the signed-in user's P&L lines for a company.
@@ -24,16 +25,14 @@ export async function POST(request: Request) {
   if (!Number.isInteger(companyId)) {
     return NextResponse.json({ error: "companyId is required" }, { status: 400 });
   }
-  const raw = body.amount;
-  const amount = raw === "" || raw === null || raw === undefined ? 0 : Number(raw);
+  const idCheck = optionalId(body.id);
+  const checked = idCheck.error ? { error: idCheck.error } : validateCompanyLineInput(body);
+  if (checked.error) return NextResponse.json({ error: checked.error }, { status: 400 });
   try {
     const row = await saveCompanyLine(user.sub, {
-      id: body.id,
+      id: idCheck.id,
       companyId,
-      kind: body.kind === "income" ? "income" : "expense",
-      category: body.category ?? "",
-      description: body.description ?? "",
-      amount: Number.isFinite(amount) ? Math.abs(amount) : 0,
+      ...checked.data!,
     });
     await revertSubmissionToDraft(user.sub, await activeTaxYear());
     return NextResponse.json({ row }, { status: body.id ? 200 : 201 });

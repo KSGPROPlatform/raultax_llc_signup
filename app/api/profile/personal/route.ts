@@ -4,6 +4,7 @@ import { upsertUser, type Profile } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 import type { PersonalInfoValues } from "@/components/profile/PersonalInfoForm";
 import { getUserProfile, listDeclarations, createDeclaration, revertSubmissionToDraft } from "@/lib/profileData";
+import { validatePersonalInput } from "@/lib/serverValidate";
 import { activeTaxYear } from "@/lib/activeYear";
 import { cardConsistencyError } from "@/lib/identity";
 
@@ -53,7 +54,10 @@ export async function POST(request: Request) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const v = (await request.json().catch(() => ({}))) as Partial<PersonalInfoValues>;
+  const raw = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  const checked = validatePersonalInput(raw);
+  if (checked.error) return NextResponse.json({ error: checked.error }, { status: 400 });
+  const v: PersonalInfoValues = checked.data!;
 
   // Save-time guard: the SSN/name being saved must match the verified SSN card
   // already on file (the card was checked against the TYPED values at upload;

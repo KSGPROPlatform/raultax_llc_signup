@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import * as na from "@/lib/nativeAuth";
+import { validateEmail, validatePassword } from "@/lib/validation";
 import { upsertUser } from "@/lib/users";
 import { SESSION_COOKIE, encryptSession, sessionCookieOptions } from "@/lib/session";
 
@@ -25,6 +26,13 @@ export async function POST(request: Request) {
           { error: "Email and password are required." },
           { status: 400 },
         );
+      }
+      // Server-side format checks (the client validates too, but the API is
+      // callable directly).
+      const emailErr = validateEmail(String(email));
+      const pwErr = emailErr ? null : validatePassword(String(password));
+      if (emailErr || pwErr) {
+        return NextResponse.json({ error: emailErr ?? pwErr }, { status: 400 });
       }
       // first + last name become the Entra display name (shown in the external-ID
       // portal). The rest of the profile is collected later in onboarding.
