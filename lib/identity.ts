@@ -3,11 +3,7 @@ import { getSpouse, getUserProfile } from "./profileData";
 import { listFiles, getExtraction } from "./files";
 import { activeTaxYear } from "./activeYear";
 
-// TEMP: only used by the disabled SSN cross-check below — restore with it.
-// const digitsOf = (v: unknown) => String(v ?? "").replace(/\D/g, "");
-
-// TEMP kill-switch (Doane, 2026-07-09): card-vs-typed identity guard off.
-const CARD_GUARD_ENABLED = false as boolean;
+const digitsOf = (v: unknown) => String(v ?? "").replace(/\D/g, "");
 
 // The typed first AND last name must both appear as tokens in the card's name
 // (case-insensitive, any order — tolerates middle names/initials on the card).
@@ -55,10 +51,6 @@ export async function cardConsistencyError(
   docType: "ssn_copy" | "spouse_ssn_copy",
   saving: { name?: string; ssn?: string },
 ): Promise<string | null> {
-  // TEMP DISABLED per Doane (2026-07-09): SSN + name cross-checks are off for
-  // now — flip CARD_GUARD_ENABLED back to true (and uncomment the SSN block
-  // below) to restore the guard.
-  if (!CARD_GUARD_ENABLED) return null;
   try {
     const files = await listFiles(oid);
     const card = files.find((f) => f.doc_type === docType);
@@ -73,13 +65,11 @@ export async function cardConsistencyError(
     }
     const who = docType === "spouse_ssn_copy" ? "your spouse's" : "your";
 
-    // TEMP DISABLED per Doane (2026-07-09) — SSN cross-check off everywhere
-    // for now (also in analyzeDocument's gates); re-enable by uncommenting.
-    // const cardSsn = digitsOf(fields.ssn);
-    // const savedSsn = digitsOf(saving.ssn);
-    // if (cardSsn && savedSsn && cardSsn !== savedSsn) {
-    //   return `The Social Security number doesn't match ${who} uploaded SSN card — update the number or replace the card.`;
-    // }
+    const cardSsn = digitsOf(fields.ssn);
+    const savedSsn = digitsOf(saving.ssn);
+    if (cardSsn && savedSsn && cardSsn !== savedSsn) {
+      return `The Social Security number doesn't match ${who} uploaded SSN card — update the number or replace the card.`;
+    }
     const cardName = String(fields.name ?? "").trim();
     const savingName = (saving.name ?? "").trim();
     if (cardName && savingName && !nameMatches(savingName, cardName)) {

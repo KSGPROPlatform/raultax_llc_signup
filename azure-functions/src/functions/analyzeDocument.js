@@ -53,26 +53,24 @@ function gateResult(docType, flat, expected) {
     // The W-2 employee SSN / 1099 recipient TIN must belong to the account
     // holder. Forms often mask all but the LAST 4 DIGITS, so: full compare when
     // the form shows all 9, last-4 compare otherwise; unreadable -> reject.
-    // TEMP DISABLED per Doane (2026-07-09) — re-enable by uncommenting.
-    // if (expected.ssn) {
-    //   const formSsn = digits(flat.ssn);
-    //   const userSsn = digits(expected.ssn);
-    //   if (formSsn.length >= 9 && userSsn.length >= 9) {
-    //     if (formSsn.slice(-9) !== userSsn.slice(-9)) return { reason: "ssn_mismatch" };
-    //   } else if (formSsn.length >= 4) {
-    //     if (formSsn.slice(-4) !== userSsn.slice(-4)) return { reason: "ssn_mismatch" };
-    //   } else {
-    //     return { reason: "ssn_unreadable" };
-    //   }
-    // }
+    if (expected.ssn) {
+      const formSsn = digits(flat.ssn);
+      const userSsn = digits(expected.ssn);
+      if (formSsn.length >= 9 && userSsn.length >= 9) {
+        if (formSsn.slice(-9) !== userSsn.slice(-9)) return { reason: "ssn_mismatch" };
+      } else if (formSsn.length >= 4) {
+        if (formSsn.slice(-4) !== userSsn.slice(-4)) return { reason: "ssn_mismatch" };
+      } else {
+        return { reason: "ssn_unreadable" };
+      }
+    }
     // The employee (W-2) / recipient (1099) printed on the form must be the
     // account holder.
-    // TEMP DISABLED per Doane (2026-07-09) — re-enable by uncommenting.
-    // if (expected.name) {
-    //   const formName = String(flat.employee_name ?? flat.recipient_name ?? "").trim();
-    //   if (!formName) return { reason: "name_unreadable" };
-    //   if (!nameMatches(expected.name, formName)) return { reason: "name_mismatch" };
-    // }
+    if (expected.name) {
+      const formName = String(flat.employee_name ?? flat.recipient_name ?? "").trim();
+      if (!formName) return { reason: "name_unreadable" };
+      if (!nameMatches(expected.name, formName)) return { reason: "name_mismatch" };
+    }
     // And the employer (W-2) / payer company (1099) must be the company the
     // user entered on this job (skipped when the job has no company yet).
     if (expected.company) {
@@ -82,15 +80,13 @@ function gateResult(docType, flat, expected) {
     }
   }
   if (IDENTITY_DOCS.has(docType)) {
-    // TEMP DISABLED per Doane (2026-07-09) — SSN and name cross-checks both
-    // off for now; re-enable by uncommenting.
-    // if (expected.ssn && digits(flat.ssn) !== digits(expected.ssn)) {
-    //   return { reason: "ssn_mismatch" };
-    // }
-    // if (expected.name) {
-    //   if (!String(flat.name ?? "").trim()) return { reason: "name_unreadable" };
-    //   if (!nameMatches(expected.name, flat.name)) return { reason: "name_mismatch" };
-    // }
+    if (expected.ssn && digits(flat.ssn) !== digits(expected.ssn)) {
+      return { reason: "ssn_mismatch" };
+    }
+    if (expected.name) {
+      if (!String(flat.name ?? "").trim()) return { reason: "name_unreadable" };
+      if (!nameMatches(expected.name, flat.name)) return { reason: "name_mismatch" };
+    }
   }
   return null;
 }
