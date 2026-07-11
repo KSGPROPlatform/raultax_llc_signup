@@ -14,6 +14,7 @@ import { DocUpload } from "@/components/documents/DocUpload";
 import { DeclarationsCard } from "@/components/dashboard/DeclarationsCard";
 import { SpouseSection } from "@/components/dashboard/SpouseSection";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
+import { CareProvidersSection } from "@/components/dashboard/CareProvidersSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
 import { getUserProfile, listDeclarations } from "@/lib/profileData";
@@ -132,6 +133,7 @@ export default async function UserDashboardPage() {
             Dependents
           </h2>
           <DependentsSection />
+          <CareProvidersSection />
         </section>
       )}
 

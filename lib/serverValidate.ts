@@ -154,6 +154,30 @@ function vAccountNumber(raw: unknown): { value?: string; error?: string } {
   return { value: v };
 }
 
+// Optional dollar amount: absent/empty -> null; else finite, 0..99,999,999.99.
+function vOptionalAmount(
+  label: string,
+  raw: unknown,
+): { value?: number | null; error?: string } {
+  if (raw === undefined || raw === null || raw === "") return { value: null };
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return { error: `${label} must be a number.` };
+  const abs = Math.abs(n);
+  if (abs > 99_999_999.99) return { error: `${label} is out of range.` };
+  return { value: Math.round(abs * 100) / 100 };
+}
+
+// SSN or EIN (Form 2441 provider tax id): 9 digits, either format.
+function vTaxId(raw: unknown): { value?: string; error?: string } {
+  const v = cleanText(raw);
+  if (!v) return { value: "" };
+  const digits = v.replace(/\D/g, "");
+  if (digits.length !== 9 || !/^[\d\- ]+$/.test(v)) {
+    return { error: "Provider tax ID must be a 9-digit SSN or EIN." };
+  }
+  return { value: v };
+}
+
 // ---------- option lists (mirror the form dropdowns) ----------
 
 export const MARITAL_STATUSES = ["Single", "Married", "Divorced", "Widowed", "Separated"] as const;
@@ -206,9 +230,9 @@ export function validatePersonalInput(body: Record<string, unknown>): Result<{
 // fields present in the body; each present field must be valid.
 export function validateSpouseInput(
   body: Record<string, unknown>,
-): Result<Record<string, string>> {
+): Result<Record<string, string | number>> {
   const { min, max } = dobYearRange(currentYear());
-  const out: Record<string, string> = {};
+  const out: Record<string, string | number> = {};
   const checks: [string, { value?: string; error?: string }][] = [];
   if (typeof body.first_name === "string") checks.push(["first_name", vName("Spouse first name", body.first_name)]);
   if (typeof body.last_name === "string") checks.push(["last_name", vName("Spouse last name", body.last_name)]);
@@ -226,11 +250,17 @@ export function validateSpouseInput(
     if (r.error) return { error: r.error };
     out[key] = r.value!;
   }
+  if (body.earned_income !== undefined) {
+    const ei = vOptionalAmount("Spouse earned income", body.earned_income);
+    if (ei.error) return { error: ei.error };
+    if (ei.value !== null && ei.value !== undefined) out.earned_income = ei.value;
+  }
   return { data: out };
 }
 
 export function validateDependentInput(body: Record<string, unknown>): Result<{
   full_name: string; ssn: string; date_of_birth: string; relationship: string;
+  care_expenses: number | null; is_disabled: boolean;
 }> {
   const name = vName("Dependent name", body.full_name);
   const ssn = vSsnField(body.ssn);
@@ -239,8 +269,36 @@ export function validateDependentInput(body: Record<string, unknown>): Result<{
     required: true, minYear: currentYear() - 120, maxYear: currentYear(),
   });
   const rel = vText("Relationship", body.relationship, { required: true, max: 40 });
+  const care = vOptionalAmount("Childcare expenses", body.care_expenses);
   for (const r of [name, ssn, dob, rel]) if (r.error) return { error: r.error };
-  return { data: { full_name: name.value!, ssn: ssn.value!, date_of_birth: dob.value!, relationship: rel.value! } };
+  if (care.error) return { error: care.error };
+  return {
+    data: {
+      full_name: name.value!, ssn: ssn.value!, date_of_birth: dob.value!,
+      relationship: rel.value!, care_expenses: care.value ?? null,
+      is_disabled: Boolean(body.is_disabled),
+    },
+  };
+}
+
+// Form 2441 Part I care provider.
+export function validateCareProviderInput(body: Record<string, unknown>): Result<{
+  provider_name: string; address: string; tax_id: string;
+  is_household_employee: boolean; amount_paid: number | null;
+}> {
+  const name = vText("Care provider name", body.provider_name, { required: true, max: 256 });
+  const address = vText("Provider address", body.address, { required: false, max: 512 });
+  const taxId = vTaxId(body.tax_id);
+  const amount = vOptionalAmount("Amount paid", body.amount_paid);
+  for (const r of [name, address, taxId]) if (r.error) return { error: r.error };
+  if (amount.error) return { error: amount.error };
+  return {
+    data: {
+      provider_name: name.value!, address: address.value!, tax_id: taxId.value!,
+      is_household_employee: Boolean(body.is_household_employee),
+      amount_paid: amount.value ?? null,
+    },
+  };
 }
 
 export function validateBankAccountInput(body: Record<string, unknown>): Result<{

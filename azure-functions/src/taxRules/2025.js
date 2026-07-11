@@ -79,6 +79,25 @@ module.exports = {
     // Born before Jan 2 of (year − 64): for 2025, before 1961-01-02.
   },
 
+  // [FORM 2441] Child & dependent care — every number is PRINTED on the form.
+  f2441: {
+    expenseCapOne: 3000,          // lines 3/27 — one qualifying person
+    expenseCapTwoPlus: 6000,      // lines 3/27 — two or more
+    exclusionLimit: 5000,         // line 21
+    exclusionLimitMfs: 2500,      // line 21 (MFS with spouse earned income required)
+    // Line 8 decimal table: AGI (line 7) "over / but not over" bands.
+    agiDecimalTable: [
+      { upTo: 15000, decimal: 0.35 }, { upTo: 17000, decimal: 0.34 },
+      { upTo: 19000, decimal: 0.33 }, { upTo: 21000, decimal: 0.32 },
+      { upTo: 23000, decimal: 0.31 }, { upTo: 25000, decimal: 0.30 },
+      { upTo: 27000, decimal: 0.29 }, { upTo: 29000, decimal: 0.28 },
+      { upTo: 31000, decimal: 0.27 }, { upTo: 33000, decimal: 0.26 },
+      { upTo: 35000, decimal: 0.25 }, { upTo: 37000, decimal: 0.24 },
+      { upTo: 39000, decimal: 0.23 }, { upTo: 41000, decimal: 0.22 },
+      { upTo: 43000, decimal: 0.21 }, { upTo: Infinity, decimal: 0.20 },
+    ],
+  },
+
   // Heuristic only (flagging, not computation): AGI under this + likely EIC.
   eicFlagAgiCeiling: 70000,
 };

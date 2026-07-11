@@ -8,6 +8,7 @@ export const FORM_1040_SECTIONS: { title: string; lines: LineDef[] }[] = [
     title: "Income",
     lines: [
       ["line_1a", "1a — Wages (from your W-2s, box 1)"],
+      ["line_1e", "1e — Taxable dependent care benefits (Form 2441)"],
       ["line_1z", "1z — Total wages"],
       ["line_8", "8 — Additional income (business)"],
       ["line_9", "9 — Total income"],
@@ -31,6 +32,7 @@ export const FORM_1040_SECTIONS: { title: string; lines: LineDef[] }[] = [
       ["line_16", "16 — Tax"],
       ["line_18", "18 — Tax before credits"],
       ["line_19", "19 — Child tax credit / other dependents"],
+      ["line_20", "20 — Child & dependent care credit (Schedule 3)"],
       ["line_22", "22 — Tax after credits"],
       ["line_23", "23 — Other taxes (self-employment)"],
       ["line_24", "24 — TOTAL TAX"],

@@ -9,8 +9,8 @@ const { sql, getPool } = require("../db");
 //   POST   { oid, tax_year, ...fields }           -> upsert for the year (absent fields are kept)
 //   DELETE ?oid=&taxYear=                         -> remove that year's spouse (all years if no year)
 const COLS = `id, owner_oid, first_name, last_name, date_of_birth, ssn,
-              street_address, city, state_province, postal_code, tax_year,
-              created_at, updated_at`;
+              street_address, city, state_province, postal_code, earned_income,
+              tax_year, created_at, updated_at`;
 const FALLBACK_YEAR = () => new Date().getFullYear() - 1; // latest declarable year
 
 app.http("spouse", {
@@ -55,7 +55,10 @@ app.http("spouse", {
           .input("street_address", sql.NVarChar(256), orNull(b.street_address))
           .input("city", sql.NVarChar(128), orNull(b.city))
           .input("state_province", sql.NVarChar(128), orNull(b.state_province))
-          .input("postal_code", sql.NVarChar(16), orNull(b.postal_code)).query(`
+          .input("postal_code", sql.NVarChar(16), orNull(b.postal_code))
+          .input("earned_income", sql.Decimal(18, 2),
+            Number.isFinite(Number(b.earned_income)) && b.earned_income !== null && b.earned_income !== ""
+              ? Number(b.earned_income) : null).query(`
             MERGE raul_tax_spouse AS t
             USING (SELECT @oid AS owner_oid, @year AS tax_year) AS s
               ON t.owner_oid = s.owner_oid AND t.tax_year = s.tax_year
@@ -68,18 +71,19 @@ app.http("spouse", {
               city = COALESCE(@city, t.city),
               state_province = COALESCE(@state_province, t.state_province),
               postal_code = COALESCE(@postal_code, t.postal_code),
+              earned_income = COALESCE(@earned_income, t.earned_income),
               updated_at = SYSUTCDATETIME()
             WHEN NOT MATCHED THEN INSERT
               (owner_oid, tax_year, first_name, last_name, date_of_birth, ssn,
-               street_address, city, state_province, postal_code)
+               street_address, city, state_province, postal_code, earned_income)
               VALUES (@oid, @year, COALESCE(@first_name, ''), COALESCE(@last_name, ''),
                       COALESCE(@date_of_birth, ''), COALESCE(@ssn, ''),
                       COALESCE(@street_address, ''), COALESCE(@city, ''),
-                      COALESCE(@state_province, ''), COALESCE(@postal_code, ''))
+                      COALESCE(@state_province, ''), COALESCE(@postal_code, ''), @earned_income)
             OUTPUT inserted.id, inserted.owner_oid, inserted.first_name,
                    inserted.last_name, inserted.date_of_birth, inserted.ssn,
                    inserted.street_address, inserted.city, inserted.state_province,
-                   inserted.postal_code, inserted.tax_year,
+                   inserted.postal_code, inserted.earned_income, inserted.tax_year,
                    inserted.created_at, inserted.updated_at;
           `);
         return { status: 200, jsonBody: result.recordset[0] };

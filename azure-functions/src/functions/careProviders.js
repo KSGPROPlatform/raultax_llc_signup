@@ -1,18 +1,19 @@
 const { app } = require("@azure/functions");
 const { sql, getPool } = require("../db");
 
-// /api/dependents — a raultax user's tax dependents (Form 2), PER TAX YEAR.
-// Sensitive fields (ssn) live here, not in Entra. Every row is scoped by
-// owner_oid (the Entra object id), so a caller can only ever touch their own.
-//   GET    ?oid=&taxYear=                                         -> list (year-filtered when given)
-//   POST   { oid, id?, full_name, ssn, date_of_birth, relationship, tax_year } -> insert, or owner-checked update when id is given
-//   DELETE ?oid=&id=                                              -> owner-checked delete
+// /api/careProviders — Form 2441 Part I care providers, PER TAX YEAR (the form
+// makes Part I mandatory whenever dependent-care benefits or expenses exist).
+// Every row is scoped by owner_oid so a caller only ever touches their own.
+//   GET    ?oid=&taxYear=                       -> list (year-filtered when given)
+//   POST   { oid, id?, provider_name, address, tax_id,
+//            is_household_employee, amount_paid, tax_year }
+//   DELETE ?oid=&id=
 const FALLBACK_YEAR = () => new Date().getFullYear() - 1; // latest declarable year
 
-app.http("dependents", {
+app.http("careProviders", {
   methods: ["GET", "POST", "DELETE"],
   authLevel: "function",
-  route: "dependents",
+  route: "careProviders",
   handler: async (request, context) => {
     try {
       const pool = await getPool();
@@ -28,9 +29,9 @@ app.http("dependents", {
           where += " AND tax_year = @year";
         }
         const result = await req.query(`
-            SELECT id, owner_oid, full_name, ssn, date_of_birth, relationship,
-                   care_expenses, is_disabled, tax_year, created_at, updated_at
-            FROM raul_tax_dependents
+            SELECT id, owner_oid, provider_name, address, tax_id,
+                   is_household_employee, amount_paid, tax_year, created_at, updated_at
+            FROM raul_tax_care_providers
             WHERE ${where}
             ORDER BY id DESC;
           `);
@@ -44,27 +45,24 @@ app.http("dependents", {
         const req = pool
           .request()
           .input("oid", sql.NVarChar(64), b.oid)
-          .input("full_name", sql.NVarChar(256), b.full_name ?? "")
-          .input("ssn", sql.NVarChar(32), b.ssn ?? "")
-          .input("date_of_birth", sql.NVarChar(32), b.date_of_birth ?? "")
-          .input("relationship", sql.NVarChar(64), b.relationship ?? "")
-          .input("care", sql.Decimal(18, 2), Number.isFinite(Number(b.care_expenses)) ? Number(b.care_expenses) : null)
-          .input("disabled", sql.Bit, b.is_disabled ? 1 : 0)
+          .input("provider_name", sql.NVarChar(256), b.provider_name ?? "")
+          .input("address", sql.NVarChar(512), b.address ?? "")
+          .input("tax_id", sql.NVarChar(32), b.tax_id ?? "")
+          .input("hh", sql.Bit, b.is_household_employee ? 1 : 0)
+          .input("amount", sql.Decimal(18, 2), Number.isFinite(Number(b.amount_paid)) ? Number(b.amount_paid) : null)
           .input("year", sql.Int, year);
 
         const OUTPUT = `
-          OUTPUT inserted.id, inserted.owner_oid, inserted.full_name, inserted.ssn,
-                 inserted.date_of_birth, inserted.relationship, inserted.care_expenses,
-                 inserted.is_disabled, inserted.tax_year,
-                 inserted.created_at, inserted.updated_at`;
+          OUTPUT inserted.id, inserted.owner_oid, inserted.provider_name, inserted.address,
+                 inserted.tax_id, inserted.is_household_employee, inserted.amount_paid,
+                 inserted.tax_year, inserted.created_at, inserted.updated_at`;
 
         if (b.id) {
           // Updates keep the row's original year.
           const result = await req.input("id", sql.Int, Number(b.id)).query(`
-            UPDATE raul_tax_dependents
-            SET full_name = @full_name, ssn = @ssn, date_of_birth = @date_of_birth,
-                relationship = @relationship, care_expenses = @care,
-                is_disabled = @disabled, updated_at = SYSUTCDATETIME()
+            UPDATE raul_tax_care_providers
+            SET provider_name = @provider_name, address = @address, tax_id = @tax_id,
+                is_household_employee = @hh, amount_paid = @amount, updated_at = SYSUTCDATETIME()
             ${OUTPUT}
             WHERE id = @id AND owner_oid = @oid;
           `);
@@ -73,9 +71,10 @@ app.http("dependents", {
         }
 
         const result = await req.query(`
-          INSERT INTO raul_tax_dependents (owner_oid, full_name, ssn, date_of_birth, relationship, care_expenses, is_disabled, tax_year)
+          INSERT INTO raul_tax_care_providers
+            (owner_oid, provider_name, address, tax_id, is_household_employee, amount_paid, tax_year)
           ${OUTPUT}
-          VALUES (@oid, @full_name, @ssn, @date_of_birth, @relationship, @care, @disabled, @year);
+          VALUES (@oid, @provider_name, @address, @tax_id, @hh, @amount, @year);
         `);
         return { status: 201, jsonBody: result.recordset[0] };
       }
@@ -90,14 +89,14 @@ app.http("dependents", {
           .request()
           .input("oid", sql.NVarChar(64), oid)
           .input("id", sql.Int, id).query(`
-            DELETE FROM raul_tax_dependents WHERE id = @id AND owner_oid = @oid;
+            DELETE FROM raul_tax_care_providers WHERE id = @id AND owner_oid = @oid;
           `);
         return { status: 200, jsonBody: { ok: true } };
       }
 
       return { status: 405, jsonBody: { error: "Method not allowed" } };
     } catch (err) {
-      context.error("dependents failed", err);
+      context.error("careProviders failed", err);
       return { status: 500, jsonBody: { error: "Internal error" } };
     }
   },

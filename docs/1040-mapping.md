@@ -77,7 +77,7 @@ starts only from what is written here.
 ### Sub-form registry (modules to build when triggered lines go live)
 | Form | Trigger | Outputs | Notes / year constants (2025) |
 |---|---|---|---|
-| **2441** (child & dependent care) | W-2 box 10 > 0 (or user childcare expenses) | line 26 → 1040 `1e`; line 11 → Schedule 3 line 2 | needs care providers + per-child expenses (not collected); expense caps $3,000/$6,000; AGI decimal table |
+| **2441** (child & dependent care) | **BUILT (v1) — see "Form 2441 module" section** | line 26 → 1040 `1e`; line 11 → Schedule 3 line 2 → 1040 line 20 | ALWAYS COMPUTED when box 10 > 0 OR care expenses entered — box 10 is an input, never the 1e value (Doane 2026-07-11) |
 | **8839** (adoption) | W-2 box 12 **code T** | line 31 → `1f`; line 13 → 1040 line 30; line 18 → Schedule 3 6c | needs children/adoption details; max $17,280/child; phase-out $259,190 / $40,000 |
 | **8919** (uncollected SS/Medicare) | same firm on W-2 + 1099 (code H); else preparer | line 6 → `1g`; line 13 → Schedule 2 line 6 | SS wage cap $176,100; rates 6.2% / 1.45% |
 
@@ -156,6 +156,54 @@ never written from memory.
 
 ### Tax & Credits sub-form specs (extracted from the uploaded 2025 forms —
 ### all constants below are PRINTED on the official forms = locked)
+
+**Form 2441 module (BUILT v1, 2026-07-11) → `line_1e` + Schedule 3 line 2 → `line_20`.
+Doctrine (Doane): ALWAYS COMPUTE — W-2 box 10 is only an INPUT to Part III;
+line 1e is only ever the COMPUTED line 26 (frequently $0 when benefits are
+fully excluded). Runs when Σ box 10 > 0 OR any dependent has care expenses.**
+
+*New inputs:* per-dependent `care_expenses` (qualified expenses paid in the
+year) + `is_disabled` (form 2(c): over-12 and unable to self-care); care
+providers table (Part I: name, address, SSN/EIN, household-employee?, amount);
+spouse `earned_income` (form lines 5/19, MFJ). Qualifying person = dependent
+under 13 (13th birthday > Jan 1 of year; turned-13-mid-year → flag: only
+pre-birthday expenses qualify) OR `is_disabled`.
+
+*Earned income (v1 definition, documented deviation):* self = Σ W-2 box 1 +
+(SE ? net earnings (SE line 6) − ½ SE tax (S1 line 15) : 0); taxable benefits
+(1e) NOT added back (conservative; preparer reviews — flag when SE present).
+Spouse = the typed `earned_income` (MFJ). MFJ with expenses/box 10 but spouse
+earned income missing → lines 5/19 = 0 → credit 0 and benefits fully taxable
++ flag ("never guess" rule; UI collects the field to avoid this).
+
+*Part III (runs when Σ box 10 > 0):* 12 = Σ box 10; 13 = 0, 14 = 0
+(grace-period carryover/forfeitures v2); 15 = 12+13−14; 16 = Σ qualifying
+persons' care_expenses (uncapped); 17 = min(15,16); 18 = earned self;
+19 = MFJ → spouse earned; **MFS → 0 (v1 conservative: all benefits taxable,
+flag)**; else = 18; 20 = smallest(17,18,19); 21 = **$5,000** ($2,500 MFS);
+22 = 0 (sole-prop/partnership DCAP v2); 23 = 15 − 22; 24 = smallest(20,21,22)
+= 0 in v1; 25 = (22=0) → min(20,21); **26 = max(0, 23 − 25) → 1040 `line_1e`**
+(NULL when the module never ran — not 0). `line_1z` = 1a + 1e now.
+27 = **$3,000 / $6,000** (1 vs 2+ qualifying persons); 28 = 24 + 25;
+29 = 27 − 28 (≤0 → stop, no credit); 30 = max(0, 16 − 28) [form: line-2
+expenses excluding benefits — v1 approximation]; 31 = min(29,30) → line 3.
+
+*Part II (credit; skipped for MFS — form line A, preparer exception only):*
+3 = Part III ran ? line 31 : min(Σ expenses, $3,000/$6,000 cap);
+4 = earned self; 5 = MFJ → spouse earned, else = 4; 6 = smallest(3,4,5);
+7 = 1040 line 11a (AGI); 8 = decimal from the PRINTED table: ≤15k .35, then
+−.01 per $2k band (15–17 .34 … 41–43 .21), >43k .20; 9a = 6 × 8; 9b = 0
+(prior-year expenses paid this year v2); 9c = 9a + 9b; 10 = Credit Limit
+Worksheet v1 = 1040 line 18 (no other pre-2441 credits computed);
+**11 = min(9c, 10) → Schedule 3 line 2** (no Sch-3 table; the 2441 row stores
+it) → `line_20` = Schedule 3 line 8 = line 2 (only Part I credit in v1).
+
+*Downstream rewires:* 8812 line 13 (Credit Limit Wkst A) = line 18 − Sch3
+line 2 (2441 credit reduces the CTC headroom); `line_21` = 19 + 20 unchanged.
+*Gates/flags:* box 10 or expenses present but NO care provider row → flag
+(Part I is mandatory); checkboxes A (MFS exception) & B (student/disabled
+deemed income) = v2/preparer. Storage: `raul_tax_form_2441` row per
+declaration (f2441_* columns) + `raul_tax_care_providers`.
 
 **Schedule 8812 → `line_19` (+ `line_28` additional CTC). Trigger: dependents.**
 - 3 = MAGI = 11a + exclusions (2a–2c parked)
@@ -308,9 +356,12 @@ standard deduction):
    overrides; freeze on approve; user sees numbers only after approval.
 7. Golden test suite of hand-computed returns.
 
-**V2**: lines 2/3 via 1099-INT/DIV + Schedule B; EIC; 8863; full 2441/8839/
-8919 modules; dependent checkboxes; digital assets Q; Schedule C categories;
-1099-NEC→Sch C; filled-1040 PDF from the frozen row; user refund reveal.
+**V2**: lines 2/3 via 1099-INT/DIV + Schedule B; EIC; 8863; 8839/8919
+modules (2441 SHIPPED 2026-07-11 — pulled forward; leftovers: grace-period
+carryovers 13/14, prior-year expenses 9b, sole-prop DCAP 22, student/disabled
+deemed income, MFS exceptions); dependent checkboxes; digital assets Q;
+Schedule C categories; 1099-NEC→Sch C; user refund reveal.
+(Filled-1040 PDF also shipped 2026-07-09.)
 
 **V3**: Sch D/8949, Sch E, Sch F; Schedule A automation via 1098 extraction;
 AMT/8959/8960/8995-A; cross-year carryforwards (QBI losses, adoption credit);
@@ -353,3 +404,13 @@ Forms to upload at v2 start: Schedule B, Schedule EIC, Form 8863, full Sch C.
     frozen respected) + "Download IRS Form 1040" button on
     /dashboard/return. Visually verified on MFJ-draft and MFS-approved
     renders.
+- 2026-07-11 (Form 2441 module): **DONE** — always computed (box 10 = input
+  only; 1e = computed line 26). `sql/create_2441_tables.sql` (form table +
+  care providers + dependent/spouse column adds — Doane runs FIRST);
+  `taxRules/2025.js` f2441 constants (all printed on the form);
+  `taxEngine.js` Part III→1e→1z + Part II→Sch3 line 2→line 20 + 8812 limit
+  −s3_2; golden tests 4–6 (full exclusion→1e=0, tax-limited credit,
+  MFS all-taxable) + guards; `calc1040.js` snapshot (providers, care
+  expenses, disabled, spouse earned income) + f2441 upsert + stale-row
+  clear; `careProviders` function + app CRUD; DependentForm care fields,
+  CareProvidersSection, SpouseForm earned income; lines 1e/20 in displays.

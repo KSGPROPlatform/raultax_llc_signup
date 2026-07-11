@@ -103,6 +103,105 @@ console.log("GOLDEN 3 — Single SENIOR (b.1955), business only +30,000, no W-2:
 }
 
 // ---------------------------------------------------------------------------
+console.log("GOLDEN 4 — Form 2441 MFJ: box 10 = 5,000 FULLY EXCLUDED (1e = 0):");
+// Wages 60,000, box10 5,000, spouse earned 30,000, kids 5 & 8 w/ SSN,
+// care expenses 4,000 + 4,000, provider on file.
+// Part III: 12=15=5,000; 16=8,000; 17=5,000; 18=60,000; 19=30,000; 20=5,000
+// 21=5,000; 24=0; 25=5,000 → 26=0 → line 1e = 0 (box 10 NEVER lands raw!)
+// 27=6,000; 28=5,000; 29=1,000; 30=3,000; 31=1,000
+// 1z=60,000; AGI=60,000; 12e=31,500; 15=28,500; 16 = 2,385+558 = 2,943
+// Part II: 3=1,000; 6=1,000; 7=60,000 → .20 → 9a=200; 10=2,943 → 11=200 → line 20=200
+// 8812: 8=4,400; 13=2,943−200=2,743 → 19=2,743; ACTC: 16a=1,657; 16b=3,400 → 28=1,657
+// 21=2,943; 22=0; 24=0; 33=4,000+1,657=5,657 → refund 5,657
+{
+  const out = computeAll({
+    taxYear: 2025,
+    filingStatus: "Married filing jointly",
+    birthDateSelf: "06/15/1988",
+    birthDateSpouse: "02/20/1990",
+    w2s: [{ box1: 60000, box2: 4000, box3: 60000, box7: 0, box10: 5000, employer: "Acme" }],
+    companies: [],
+    dependents: [
+      { dob: "05/01/2020", hasSsn: true, careExpenses: 4000 },
+      { dob: "03/15/2017", hasSsn: true, careExpenses: 4000 },
+    ],
+    careProviders: [{ name: "Sunny Days Daycare", amountPaid: 8000 }],
+    spouseEarnedIncome: 30000,
+  });
+  expectEq("f2441_12 (benefits in)", out.f2441.f2441_12, 5000);
+  expectEq("f2441_25 (excluded)", out.f2441.f2441_25, 5000);
+  expectEq("f2441_26 (taxable)", out.f2441.f2441_26, 0);
+  expectEq("line_1e = COMPUTED 0, not box 10", out.f1040.line_1e, 0);
+  expectEq("line_1z", out.f1040.line_1z, 60000);
+  expectEq("f2441_31 -> line 3", out.f2441.f2441_31, 1000);
+  expectEq("f2441_8 (decimal)", out.f2441.f2441_8, 0.20);
+  expectEq("f2441_11 (credit)", out.f2441.f2441_11, 200);
+  expectEq("line_20 (Sch 3)", out.f1040.line_20, 200);
+  expectEq("line_19 (CTC after 2441 limit)", out.f1040.line_19, 2743);
+  expectEq("line_28 (ACTC)", out.f1040.line_28, 1657);
+  expectEq("line_22", out.f1040.line_22, 0);
+  expectEq("line_34 (refund)", out.f1040.line_34, 5657);
+  expectEq("no provider flag (provider on file)", out.flags.some((f) => f.includes("Part I is mandatory")), false);
+}
+
+// ---------------------------------------------------------------------------
+console.log("GOLDEN 5 — Form 2441 Single: expenses only, credit capped by tax:");
+// Wages 20,000, no box 10, kid age 4, care 2,500, provider on file.
+// No Part III → 1e stays NULL. 3=2,500; 6=2,500; AGI 20,000 → .32 → 9a=800
+// tax: 15=4,250 → 16=425 → credit 11 = min(800, 425) = 425 → line 20 = 425
+// 8812: 12=2,200; 13=425−425=0 → 19=0; ACTC 16a=2,200; 16b=1,700 → 28=1,700
+// 33=500+1,700=2,200 → refund 2,200
+{
+  const out = computeAll({
+    taxYear: 2025,
+    filingStatus: "Single",
+    birthDateSelf: "05/05/1995",
+    w2s: [{ box1: 20000, box2: 500, box3: 20000, box7: 0, employer: "Shop" }],
+    companies: [],
+    dependents: [{ dob: "07/04/2021", hasSsn: true, careExpenses: 2500 }],
+    careProviders: [{ name: "Little Steps", amountPaid: 2500 }],
+  });
+  expectEq("line_1e stays NULL (no Part III)", out.f1040.line_1e, undefined);
+  expectEq("f2441_3", out.f2441.f2441_3, 2500);
+  expectEq("f2441_8 (decimal .32)", out.f2441.f2441_8, 0.32);
+  expectEq("f2441_9a", out.f2441.f2441_9a, 800);
+  expectEq("f2441_11 (tax-limited)", out.f2441.f2441_11, 425);
+  expectEq("line_20", out.f1040.line_20, 425);
+  expectEq("line_19 (CTC crowded out)", out.f1040.line_19, 0);
+  expectEq("line_28 (ACTC)", out.f1040.line_28, 1700);
+  expectEq("line_34 (refund)", out.f1040.line_34, 2200);
+}
+
+// ---------------------------------------------------------------------------
+console.log("GOLDEN 6 — Form 2441 MFS: benefits fully TAXABLE, credit denied:");
+// Wages 40,000, box10 3,000, kid age 6 care 3,000, provider on file, MFS.
+// Part III: 19=0 → 20=0 → 25=0 → 26=3,000 → 1e=3,000; 1z=43,000
+// Part II skipped (MFS) → line 20 = 0
+// 12e=15,750; 15=27,250; 16 = 1,192.50+1,839 = 3,031.50 → 3,032
+// 8812: 12=2,200; 13=3,032 → 19=2,200; 16a=0 → 28=0; 22=832; 24=832
+// 33=3,500 → refund 2,668
+{
+  const out = computeAll({
+    taxYear: 2025,
+    filingStatus: "Married filing separately",
+    birthDateSelf: "01/10/1992",
+    w2s: [{ box1: 40000, box2: 3500, box3: 40000, box7: 0, box10: 3000, employer: "Ora" }],
+    companies: [],
+    dependents: [{ dob: "08/08/2019", hasSsn: true, careExpenses: 3000 }],
+    careProviders: [{ name: "ABC Kids", amountPaid: 3000 }],
+  });
+  expectEq("f2441_26 (all taxable)", out.f2441.f2441_26, 3000);
+  expectEq("line_1e", out.f1040.line_1e, 3000);
+  expectEq("line_1z includes 1e", out.f1040.line_1z, 43000);
+  expectEq("line_20 (no MFS credit)", out.f1040.line_20, 0);
+  expectEq("line_16", out.f1040.line_16, 3032);
+  expectEq("line_19 (CTC)", out.f1040.line_19, 2200);
+  expectEq("line_24", out.f1040.line_24, 832);
+  expectEq("line_34 (refund)", out.f1040.line_34, 2668);
+  expectEq("MFS taxable-benefits flag", out.flags.some((f) => f.includes("treats all benefits as taxable")), true);
+}
+
+// ---------------------------------------------------------------------------
 console.log("GUARDS:");
 {
   const un = computeAll({ taxYear: 2024, filingStatus: "Single", w2s: [], companies: [], dependents: [] });
@@ -115,6 +214,18 @@ console.log("GUARDS:");
     companies: [], dependents: [],
   });
   expectEq("2441 trigger flagged (box 10)", trigger.flags.some((f) => f.includes("2441")), true);
+  // Box 10 with NO care details: everything taxable + provider flag.
+  expectEq("box10 w/o expenses -> 1e all taxable", trigger.f1040.line_1e, 3000);
+  expectEq("box10 w/o provider -> Part I flag", trigger.flags.some((f) => f.includes("Part I is mandatory")), true);
+  // MFJ with box 10 but NO spouse earned income: conservative + explicit flag.
+  const noSpouse = computeAll({
+    taxYear: 2025, filingStatus: "Married filing jointly", birthDateSelf: "01/01/1990",
+    w2s: [{ box1: 30000, box2: 0, box3: 30000, box7: 0, box10: 2000, employer: "Y" }],
+    companies: [], dependents: [{ dob: "01/01/2020", hasSsn: true, careExpenses: 2000 }],
+    careProviders: [{ name: "Z", amountPaid: 2000 }],
+  });
+  expectEq("MFJ missing spouse income -> benefits taxable", noSpouse.f1040.line_1e, 2000);
+  expectEq("MFJ missing spouse income flag", noSpouse.flags.some((f) => f.includes("SPOUSE's earned income")), true);
 }
 
 console.log(failures === 0 ? "\nALL GOLDEN TESTS PASS" : `\n${failures} FAILURE(S)`);

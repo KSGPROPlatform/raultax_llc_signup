@@ -88,7 +88,7 @@ export function DependentsSection() {
               key={r.id}
               icon={Users}
               title={r.full_name || "—"}
-              subtitle={`${r.relationship || "—"} · SSN ${maskTail(r.ssn)} · ${r.date_of_birth || "—"}`}
+              subtitle={`${r.relationship || "—"} · SSN ${maskTail(r.ssn)} · ${r.date_of_birth || "—"}${Number(r.care_expenses) > 0 ? ` · care $${Number(r.care_expenses).toLocaleString()}` : ""}`}
               onEdit={() => setEditing(r)}
               onDelete={() => remove(r)}
             />
@@ -106,7 +106,18 @@ export function DependentsSection() {
           onClose={() => setEditing(null)}
         >
           <DependentForm
-            initial={editing !== "new" ? editing : undefined}
+            initial={
+              editing !== "new"
+                ? {
+                    ...editing,
+                    care_expenses:
+                      editing.care_expenses === null || editing.care_expenses === undefined
+                        ? ""
+                        : String(editing.care_expenses),
+                    is_disabled: Boolean(editing.is_disabled),
+                  }
+                : undefined
+            }
             onSubmit={save}
             onCancel={() => setEditing(null)}
             busy={busy}

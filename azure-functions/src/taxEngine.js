@@ -9,7 +9,9 @@
 //   w2s:      [{ box1, box2, box3, box7, box10, box12T, employer }],
 //   f1099s:   [{ withheld, payer }],
 //   companies:[{ net, name }],
-//   dependents:[{ dob, hasSsn }],
+//   dependents:[{ dob, hasSsn, careExpenses, isDisabled }],
+//   careProviders: [{ name, amountPaid }],    // Form 2441 Part I rows
+//   spouseEarnedIncome,                       // number or null (2441 lines 5/19)
 //   estimatedPayments,                        // number or null (line 26)
 // }
 
@@ -45,6 +47,16 @@ function isQualifyingChildAge(dobStr, taxYear) {
   if (!dob) return false;
   const seventeenth = new Date(dob.getFullYear() + 17, dob.getMonth(), dob.getDate());
   return seventeenth > new Date(taxYear, 11, 31);
+}
+
+// Form 2441 qualifying person by AGE: under 13 during (part of) the year —
+// 13th birthday after Jan 1. Turning 13 mid-year still qualifies for the
+// pre-birthday expenses (flagged for the preparer).
+function isUnder13During(dobStr, taxYear) {
+  const dob = parseDate(dobStr);
+  if (!dob) return false;
+  const thirteenth = new Date(dob.getFullYear() + 13, dob.getMonth(), dob.getDate());
+  return thirteenth > new Date(taxYear, 0, 1);
 }
 
 // Progressive rate-schedule tax (v1 uses the rate schedule; the IRS Tax Table
@@ -92,7 +104,6 @@ function computeAll(snapshot) {
   for (const [i, w] of w2s.entries()) {
     if (!Number.isFinite(Number(w.box1))) flags.push(`W-2 #${i + 1} (${w.employer || "?"}): box 1 missing/unreadable — line 1a incomplete.`);
     if (!Number.isFinite(Number(w.box2))) flags.push(`W-2 #${i + 1} (${w.employer || "?"}): box 2 missing/unreadable — line 25a incomplete.`);
-    if (num(w.box10) > 0) flags.push(`W-2 #${i + 1}: box 10 dependent-care benefits ($${num(w.box10)}) — Form 2441 required (line 1e).`);
     if (num(w.box12T) > 0) flags.push(`W-2 #${i + 1}: box 12 code T adoption benefits — Form 8839 required (line 1f).`);
     if (num(w.box7) > 0) flags.push(`W-2 #${i + 1}: box 7 tips ($${num(w.box7)}) — possible Schedule 1-A tips deduction (qualified occupation check).`);
   }
@@ -106,8 +117,7 @@ function computeAll(snapshot) {
   // ------------------------------ Line 1 ------------------------------------
   const f1040 = {};
   f1040.line_1a = r(sum(w2s, (w) => w.box1)); // Σ box 1, year-scoped, verified docs
-  // 1b–1i parked (NULL). 1z sums 1a–1h with NULLs as 0:
-  f1040.line_1z = f1040.line_1a;
+  // 1b–1i parked (NULL). 1e is set by Form 2441 Part III below; 1z after it.
 
   // --------------------------- Schedule SE (early: feeds AGI) ---------------
   const se = {};
@@ -139,6 +149,92 @@ function computeAll(snapshot) {
   s1.s1_15 = se.se_13;               // ½ SE tax deduction
   s1.s1_25 = 0;                      // 24a–24z parked
   s1.s1_26 = s1.s1_15 + s1.s1_25;    // 11–23 parked -> 0
+
+  // --------------------- Form 2441 (ALWAYS COMPUTED when triggered) ---------
+  // Doctrine: W-2 box 10 is only an INPUT — line 1e is only ever the COMPUTED
+  // Part III line 26 (often $0 when benefits are fully excluded). The module
+  // runs when box 10 exists OR the user reported childcare expenses.
+  const f2441 = {};
+  const box10Total = r(sum(w2s, (w) => w.box10));
+  const qualifyingPersons = dependents.filter(
+    (d) => isUnder13During(d.dob, taxYear) || Boolean(d.isDisabled),
+  );
+  const careExpensesTotal = r(sum(qualifyingPersons, (d) => d.careExpenses));
+  const nonQualifyingCare = r(sum(dependents, (d) => d.careExpenses)) - careExpensesTotal;
+  const ran2441 = box10Total > 0 || careExpensesTotal > 0;
+  // Earned income, v1 definition (see ledger): W-2 box 1 wages + net SE
+  // earnings − ½ SE tax; taxable benefits NOT added back (conservative).
+  const earnedSelf = Math.max(0, f1040.line_1a + (seApplies ? se.se_6 - se.se_13 : 0));
+  const spouseEarned = num(snapshot.spouseEarnedIncome);
+  const expenseCap =
+    qualifyingPersons.length >= 2 ? rules.f2441.expenseCapTwoPlus : rules.f2441.expenseCapOne;
+  let s3_2 = 0; // Schedule 3 line 2 (the 2441 credit)
+  if (ran2441) {
+    if (nonQualifyingCare > 0) {
+      flags.push(`Care expenses ($${nonQualifyingCare}) entered for dependents who aren't qualifying persons (13+ and not disabled) — excluded from Form 2441.`);
+    }
+    for (const d of qualifyingPersons) {
+      const dob = parseDate(d.dob);
+      if (dob && num(d.careExpenses) > 0) {
+        const thirteenth = new Date(dob.getFullYear() + 13, dob.getMonth(), dob.getDate());
+        if (thirteenth <= new Date(taxYear, 11, 31) && !d.isDisabled) {
+          flags.push("A qualifying child turned 13 during the year — only pre-birthday care expenses qualify (Form 2441); verify the amount entered.");
+        }
+      }
+    }
+    if ((snapshot.careProviders || []).length === 0) {
+      flags.push("Form 2441 Part I is mandatory — no care provider on file (name, address, tax ID, amount). Ask the client to add the provider.");
+    }
+    if (seApplies) {
+      flags.push("Form 2441 earned income includes self-employment (net earnings − ½ SE tax) — preparer verify (v1 definition).");
+    }
+    if (st === "mfj" && snapshot.spouseEarnedIncome == null) {
+      flags.push("Form 2441 needs the SPOUSE's earned income (lines 5/19) — missing, so the credit is $0 and benefits are fully taxable until entered.");
+    }
+
+    // ---- Part III (dependent care benefits) — only when box 10 exists ----
+    if (box10Total > 0) {
+      f2441.f2441_12 = box10Total;
+      const l15 = box10Total; // 13/14 (grace-period carryover, forfeitures) v2 -> 0
+      f2441.f2441_15 = l15;
+      f2441.f2441_16 = careExpensesTotal;
+      const l17 = Math.min(l15, careExpensesTotal);
+      f2441.f2441_17 = l17;
+      f2441.f2441_18 = earnedSelf;
+      let l19;
+      if (st === "mfj") l19 = spouseEarned;
+      else if (st === "mfs") {
+        l19 = 0; // v1 conservative: exclusion denied -> benefits fully taxable
+        flags.push("Married filing separately with dependent-care benefits — v1 treats all benefits as taxable (line 1e); preparer applies the MFS exception if it holds.");
+      } else l19 = earnedSelf;
+      f2441.f2441_19 = l19;
+      const l20 = Math.max(0, Math.min(l17, earnedSelf, l19));
+      f2441.f2441_20 = l20;
+      const l21 = st === "mfs" ? rules.f2441.exclusionLimitMfs : rules.f2441.exclusionLimit;
+      f2441.f2441_21 = l21;
+      const l22 = 0; // sole-proprietorship/partnership DCAP v2
+      const l23 = l15 - l22;
+      f2441.f2441_23 = l23;
+      const l24 = Math.min(l20, l21, l22); // = 0 while l22 = 0
+      f2441.f2441_24 = l24;
+      const l25 = l22 === 0 ? Math.min(l20, l21) : Math.max(0, Math.min(l20, l21) - l24);
+      f2441.f2441_25 = l25;
+      f2441.f2441_26 = Math.max(0, l23 - l25);
+      f1040.line_1e = f2441.f2441_26; // the ONLY way 1e is ever set
+      // Credit prerequisites (lines 27–31):
+      const l27 = expenseCap;
+      f2441.f2441_27 = l27;
+      const l28 = l24 + l25;
+      f2441.f2441_28 = l28;
+      const l29 = l27 - l28;
+      f2441.f2441_29 = l29;
+      const l30 = Math.max(0, careExpensesTotal - l28); // ledger-documented v1 approximation
+      f2441.f2441_30 = l30;
+      f2441.f2441_31 = l29 > 0 ? Math.min(l29, l30) : 0;
+    }
+  }
+  // 1z sums 1a–1h with NULLs as 0 (1e only when Form 2441 produced it):
+  f1040.line_1z = f1040.line_1a + (f1040.line_1e ?? 0);
 
   // --------------------------- Income totals / AGI --------------------------
   f1040.line_8 = s1.s1_10;
@@ -193,6 +289,33 @@ function computeAll(snapshot) {
   f1040.line_17 = 0; // Schedule 2 Part I parked
   f1040.line_18 = f1040.line_16 + f1040.line_17;
 
+  // ------------------- Form 2441 Part II (credit) → Sch 3 line 2 ------------
+  // MFS can't take the credit (form line A) — preparer applies the exception.
+  if (ran2441 && st !== "mfs" && qualifyingPersons.length > 0) {
+    const l3 =
+      box10Total > 0 ? f2441.f2441_31 ?? 0 : Math.min(careExpensesTotal, expenseCap);
+    f2441.f2441_3 = l3;
+    f2441.f2441_4 = earnedSelf;
+    const l5 = st === "mfj" ? spouseEarned : earnedSelf;
+    f2441.f2441_5 = l5;
+    const l6 = Math.max(0, Math.min(l3, earnedSelf, l5));
+    f2441.f2441_6 = l6;
+    f2441.f2441_7 = f1040.line_11a;
+    const band = rules.f2441.agiDecimalTable.find((b) => f1040.line_11a <= b.upTo);
+    const l8 = band.decimal;
+    f2441.f2441_8 = l8;
+    const l9a = r(l6 * l8);
+    f2441.f2441_9a = l9a;
+    const l9c = l9a; // 9b (prior-year expenses paid this year) v2 -> 0
+    f2441.f2441_9c = l9c;
+    const l10 = Math.max(0, f1040.line_18); // Credit Limit Wkst v1 = line 18
+    f2441.f2441_10 = l10;
+    s3_2 = Math.min(l9c, l10);
+    f2441.f2441_11 = s3_2;
+  } else if (ran2441 && st === "mfs" && careExpensesTotal > 0 && box10Total === 0) {
+    flags.push("Married filing separately with childcare expenses — the credit isn't allowed unless the MFS exception applies (preparer).");
+  }
+
   // --------------------------- Schedule 8812 (19, 28) -----------------------
   const qc = dependents.filter((d) => isQualifyingChildAge(d.dob, taxYear) && d.hasSsn);
   const others = dependents.length - qc.length;
@@ -210,7 +333,9 @@ function computeAll(snapshot) {
     const l10 = Math.ceil(excess / 1000) * 1000;
     const l11 = r(l10 * rules.ctc.phaseOutRate);
     const l12 = l8 > l11 ? l8 - l11 : 0;
-    const l13 = f1040.line_18; // v1 Credit Limit Worksheet A ≈ line 18 (no other credits)
+    // Credit Limit Worksheet A = line 18 minus Schedule 3 lines 1–4… — the
+    // 2441 credit (Sch 3 line 2) reduces the CTC headroom.
+    const l13 = Math.max(0, f1040.line_18 - s3_2);
     line19 = Math.min(l12, l13);
     // Additional CTC (refundable), Part II-A:
     if (l12 > line19 && qc.length > 0) {
@@ -230,7 +355,7 @@ function computeAll(snapshot) {
     // Residency/support confirmations are preparer's (form caution).
   }
   f1040.line_19 = line19;
-  f1040.line_20 = 0; // Schedule 3 Part I parked (2441/8839 flag when triggered)
+  f1040.line_20 = s3_2; // Schedule 3 line 8 = line 2 (2441 credit; 8839 etc. later)
   f1040.line_21 = f1040.line_19 + f1040.line_20;
   f1040.line_22 = Math.max(0, f1040.line_18 - f1040.line_21);
   f1040.line_23 = se.se_12; // Schedule 2 line 21 v1 = SE tax
@@ -260,8 +385,15 @@ function computeAll(snapshot) {
     f1040,
     s1,
     se: seApplies ? se : { se_2: se.se_2, se_3: se.se_3, se_4a: se.se_4a, se_4c: se.se_4c, se_12: 0, se_13: 0 },
+    f2441: ran2441 ? f2441 : {},
     flags,
   };
 }
 
-module.exports = { computeAll, bracketTax, isQualifyingChildAge, bornBeforeSeniorCutoff };
+module.exports = {
+  computeAll,
+  bracketTax,
+  isQualifyingChildAge,
+  bornBeforeSeniorCutoff,
+  isUnder13During,
+};

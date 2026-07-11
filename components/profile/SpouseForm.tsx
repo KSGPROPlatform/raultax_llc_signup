@@ -21,6 +21,7 @@ export type SpouseValues = {
   city: string;
   state_province: string;
   postal_code: string;
+  earned_income: string; // dollars; Form 2441 lines 5/19 (childcare credit)
 };
 
 const EMPTY: SpouseValues = {
@@ -32,6 +33,7 @@ const EMPTY: SpouseValues = {
   city: "",
   state_province: "",
   postal_code: "",
+  earned_income: "",
 };
 
 // Spouse form. `mode` is driven by the Form-1 filing status:
@@ -130,6 +132,16 @@ export function SpouseForm({
           <ComboField id="sp_state_province" label="State" required value={v.state_province} onChange={setVal("state_province")} options={STATE_NAMES} />
           <CityField id="sp_city" label="City" required value={v.city} onChange={setVal("city")} state={v.state_province} />
           <Field id="sp_postal_code" label="Postal code" required maxLength={16} value={v.postal_code} onChange={setText("postal_code")} autoComplete="off" />
+          <Field
+            id="sp_earned_income"
+            label="Spouse's earned income this tax year ($)"
+            maxLength={12}
+            placeholder="e.g. 30000"
+            value={v.earned_income}
+            onChange={(e) => setVal("earned_income")(e.target.value.replace(/[^\d.]/g, ""))}
+            autoComplete="off"
+            hint="Wages plus self-employment income. Needed to calculate the childcare credit and dependent-care benefits (Form 2441) — enter 0 if none."
+          />
         </>
       )}
 

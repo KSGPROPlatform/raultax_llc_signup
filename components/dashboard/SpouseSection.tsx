@@ -47,6 +47,10 @@ export function SpouseSection({
               city: s.city ?? "",
               state_province: s.state_province ?? "",
               postal_code: s.postal_code ?? "",
+              earned_income:
+                s.earned_income === null || s.earned_income === undefined
+                  ? ""
+                  : String(s.earned_income),
             });
           }
         } else if (active) {

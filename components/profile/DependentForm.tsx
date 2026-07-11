@@ -14,6 +14,8 @@ export type DependentValues = {
   ssn: string;
   date_of_birth: string;
   relationship: string;
+  care_expenses: string; // dollars paid for this dependent's care (Form 2441)
+  is_disabled: boolean;  // over 12 and unable to self-care (Form 2441 2(c))
 };
 
 const EMPTY: DependentValues = {
@@ -21,6 +23,8 @@ const EMPTY: DependentValues = {
   ssn: "",
   date_of_birth: "",
   relationship: "",
+  care_expenses: "",
+  is_disabled: false,
 };
 
 // One dependent (Form 2). Used in the onboarding stepper and the dashboard
@@ -53,6 +57,10 @@ export function DependentForm({
     full_name: validateName(v.full_name, "Full name"),
     ssn: validateSsn(v.ssn),
     date_of_birth: validateDob(v.date_of_birth),
+    care_expenses:
+      v.care_expenses && !Number.isFinite(Number(v.care_expenses))
+        ? "Enter a dollar amount (numbers only)."
+        : null,
   };
   const err = (k: string) => (touched[k] ? errs[k] : null);
   const touch = (k: string) => () => setTouched((t) => ({ ...t, [k]: true }));
@@ -70,6 +78,30 @@ export function DependentForm({
       <SsnField id="dep_ssn" label="Social Security number" required value={v.ssn} error={err("ssn")} onChange={setVal("ssn")} onBlur={touch("ssn")} hint="Stored securely on your account." />
       <DateField id="dep_dob" label="Date of birth" required value={v.date_of_birth} onChange={setVal("date_of_birth")} onBlur={touch("date_of_birth")} error={err("date_of_birth")} />
       <ComboField id="dep_rel" label="Relationship" required value={v.relationship} onChange={setVal("relationship")} options={RELATIONSHIPS} />
+      <Field
+        id="dep_care_expenses"
+        label="Childcare expenses paid this tax year ($)"
+        maxLength={12}
+        placeholder="e.g. 4000"
+        value={v.care_expenses}
+        error={err("care_expenses")}
+        onChange={(e) => setVal("care_expenses")(e.target.value.replace(/[^\d.]/g, ""))}
+        onBlur={touch("care_expenses")}
+        autoComplete="off"
+        hint="What you paid for this dependent's care so you could work (Form 2441). Leave empty if none — also add the care provider below the list."
+      />
+      <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+        <input
+          type="checkbox"
+          checked={v.is_disabled}
+          onChange={(e) => setV((p) => ({ ...p, is_disabled: e.target.checked }))}
+          className="mt-0.5 h-4 w-4 rounded border-zinc-300 accent-amber-500"
+        />
+        <span>
+          This person is over 12 and physically or mentally unable to care for
+          themselves <span className="text-zinc-400">(Form 2441)</span>
+        </span>
+      </label>
       <FormButtons busy={busy} submitLabel={submitLabel} onCancel={onCancel} />
     </form>
   );

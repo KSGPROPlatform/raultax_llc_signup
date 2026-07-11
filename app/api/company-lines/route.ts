@@ -26,7 +26,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "companyId is required" }, { status: 400 });
   }
   const idCheck = optionalId(body.id);
-  const checked = idCheck.error ? { error: idCheck.error } : validateCompanyLineInput(body);
+  if (idCheck.error) return NextResponse.json({ error: idCheck.error }, { status: 400 });
+  const checked = validateCompanyLineInput(body);
   if (checked.error) return NextResponse.json({ error: checked.error }, { status: 400 });
   try {
     const row = await saveCompanyLine(user.sub, {

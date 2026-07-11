@@ -82,6 +82,8 @@ export type Dependent = {
   ssn: string;
   date_of_birth: string;
   relationship: string;
+  care_expenses: number | null; // Form 2441 qualified expenses paid this year
+  is_disabled: boolean;         // Form 2441 line 2(c): over 12 and unable to self-care
   created_at: string;
   updated_at: string;
 };
@@ -91,6 +93,8 @@ export type DependentInput = {
   ssn: string;
   date_of_birth: string;
   relationship: string;
+  care_expenses?: number | null;
+  is_disabled?: boolean;
 };
 export const listDependents = (oid: string, taxYear?: number) =>
   listRows<Dependent>("dependents", oid, { taxYear });
@@ -98,6 +102,33 @@ export const saveDependent = (oid: string, d: DependentInput, taxYear?: number) 
   saveRow<Dependent>("dependents", oid, { ...d, tax_year: taxYear });
 export const deleteDependent = (oid: string, id: number) =>
   deleteRow("dependents", oid, id);
+
+// ---- Care providers (Form 2441 Part I; per tax year) ----
+export type CareProvider = {
+  id: number;
+  owner_oid: string;
+  provider_name: string;
+  address: string;
+  tax_id: string; // SSN or EIN
+  is_household_employee: boolean;
+  amount_paid: number | null;
+  created_at: string;
+  updated_at: string;
+};
+export type CareProviderInput = {
+  id?: number;
+  provider_name: string;
+  address?: string;
+  tax_id?: string;
+  is_household_employee?: boolean;
+  amount_paid?: number | null;
+};
+export const listCareProviders = (oid: string, taxYear?: number) =>
+  listRows<CareProvider>("careProviders", oid, { taxYear });
+export const saveCareProvider = (oid: string, p: CareProviderInput, taxYear?: number) =>
+  saveRow<CareProvider>("careProviders", oid, { ...p, tax_year: taxYear });
+export const deleteCareProvider = (oid: string, id: number) =>
+  deleteRow("careProviders", oid, id);
 
 // ---- Bank accounts (Form 3) ----
 export type BankAccount = {
@@ -285,6 +316,7 @@ export type Spouse = {
   city: string;
   state_province: string;
   postal_code: string;
+  earned_income: number | null; // Form 2441 lines 5/19 (MFJ credit + exclusion)
   created_at: string;
   updated_at: string;
 };
@@ -301,6 +333,7 @@ export type SpouseInput = Partial<
     | "city"
     | "state_province"
     | "postal_code"
+    | "earned_income"
   >
 >;
 

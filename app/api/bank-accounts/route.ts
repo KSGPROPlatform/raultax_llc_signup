@@ -19,7 +19,8 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => ({}));
   const idCheck = optionalId(body.id);
-  const checked = idCheck.error ? { error: idCheck.error } : validateBankAccountInput(body);
+  if (idCheck.error) return NextResponse.json({ error: idCheck.error }, { status: 400 });
+  const checked = validateBankAccountInput(body);
   if (checked.error) return NextResponse.json({ error: checked.error }, { status: 400 });
   try {
     const row = await saveBankAccount(

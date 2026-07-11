@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { listDependents, saveDependent, revertSubmissionToDraft } from "@/lib/profileData";
-import { validateDependentInput, optionalId } from "@/lib/serverValidate";
+import { listCareProviders, saveCareProvider, revertSubmissionToDraft } from "@/lib/profileData";
+import { validateCareProviderInput, optionalId } from "@/lib/serverValidate";
 import { activeTaxYear } from "@/lib/activeYear";
 
-// GET /api/dependents — the signed-in user's dependents for the active tax year.
+// GET /api/care-providers — the signed-in user's Form 2441 Part I care
+// providers for the active tax year.
 export async function GET() {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const rows = await listDependents(user.sub, await activeTaxYear());
+  const rows = await listCareProviders(user.sub, await activeTaxYear());
   return NextResponse.json({ rows });
 }
 
-// POST /api/dependents — create (no id) or update (with id) one dependent,
+// POST /api/care-providers — create (no id) or update (with id) one provider,
 // stamped with the active tax year.
 export async function POST(request: Request) {
   const user = await getSession();
@@ -20,10 +21,10 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const idCheck = optionalId(body.id);
   if (idCheck.error) return NextResponse.json({ error: idCheck.error }, { status: 400 });
-  const checked = validateDependentInput(body);
+  const checked = validateCareProviderInput(body);
   if (checked.error) return NextResponse.json({ error: checked.error }, { status: 400 });
   try {
-    const row = await saveDependent(
+    const row = await saveCareProvider(
       user.sub,
       { id: idCheck.id, ...checked.data! },
       await activeTaxYear(),

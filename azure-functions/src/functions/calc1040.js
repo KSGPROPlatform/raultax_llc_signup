@@ -15,7 +15,7 @@ const { computeAll } = require("../taxEngine");
 // Overrides (JSON on the 1040 row) are returned as-is; applying them is the
 // review UI's job so computed values stay pure.
 
-const SAFE_COL = /^(line|s1|se)_[0-9a-z]+$/;
+const SAFE_COL = /^(line|s1|se|f2441)_[0-9a-z]+$/;
 
 function parseJson(s, fallback) {
   if (s === null || s === undefined) return fallback;
@@ -74,11 +74,15 @@ async function loadSnapshot(pool, oid, taxYear) {
     SELECT date_of_birth FROM raul_tax_users WHERE entra_object_id = @oid;`)).recordset[0];
 
   const spouse = (await q(`
-    SELECT date_of_birth FROM raul_tax_spouse
+    SELECT date_of_birth, earned_income FROM raul_tax_spouse
     WHERE owner_oid = @oid AND tax_year = @year;`)).recordset[0];
 
   const dependents = (await q(`
-    SELECT date_of_birth, ssn FROM raul_tax_dependents
+    SELECT date_of_birth, ssn, care_expenses, is_disabled FROM raul_tax_dependents
+    WHERE owner_oid = @oid AND tax_year = @year;`)).recordset;
+
+  const careProviders = (await q(`
+    SELECT provider_name, amount_paid FROM raul_tax_care_providers
     WHERE owner_oid = @oid AND tax_year = @year;`)).recordset;
 
   const companies = (await q(`
@@ -111,7 +115,16 @@ async function loadSnapshot(pool, oid, taxYear) {
     w2s,
     f1099s,
     companies: companies.map((c) => ({ net: Number(c.business_expense) || 0, name: c.company_name })),
-    dependents: dependents.map((d) => ({ dob: d.date_of_birth, hasSsn: Boolean((d.ssn || "").trim()) })),
+    dependents: dependents.map((d) => ({
+      dob: d.date_of_birth,
+      hasSsn: Boolean((d.ssn || "").trim()),
+      careExpenses: d.care_expenses === null ? 0 : Number(d.care_expenses),
+      isDisabled: Boolean(d.is_disabled),
+    })),
+    careProviders: careProviders.map((p) => ({ name: p.provider_name, amountPaid: Number(p.amount_paid) || 0 })),
+    spouseEarnedIncome: spouse?.earned_income === null || spouse?.earned_income === undefined
+      ? null
+      : Number(spouse.earned_income),
     estimatedPayments: null, // input field arrives later (ledger line 26)
   };
 }
@@ -233,10 +246,23 @@ app.http("calc1040", {
       await upsertComputed(pool, "raul_tax_form_1040", oid, taxYear, out.f1040, flagsJson);
       await upsertComputed(pool, "raul_tax_schedule1", oid, taxYear, out.s1);
       await upsertComputed(pool, "raul_tax_schedule_se", oid, taxYear, out.se);
+      if (out.f2441 && Object.keys(out.f2441).length > 0) {
+        await upsertComputed(pool, "raul_tax_form_2441", oid, taxYear, out.f2441);
+      } else {
+        // The 2441 module didn't run this time — clear any stale prior result
+        // (line 1e must return to NULL = "never computed", not keep old data).
+        await pool.request()
+          .input("oid", sql.NVarChar(64), oid)
+          .input("year", sql.Int, taxYear).query(`
+            DELETE FROM raul_tax_form_2441 WHERE owner_oid = @oid AND tax_year = @year;
+            UPDATE raul_tax_form_1040 SET line_1e = NULL, updated_at = SYSUTCDATETIME()
+            WHERE owner_oid = @oid AND tax_year = @year;
+          `);
+      }
 
       return {
         status: 200,
-        jsonBody: { computed: true, frozen: false, f1040: out.f1040, s1: out.s1, se: out.se, flags: out.flags },
+        jsonBody: { computed: true, frozen: false, f1040: out.f1040, s1: out.s1, se: out.se, f2441: out.f2441, flags: out.flags },
       };
     } catch (err) {
       context.error("calc1040 failed", err);
