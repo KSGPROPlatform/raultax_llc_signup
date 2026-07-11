@@ -33,7 +33,14 @@ console.log("GOLDEN 1 — Single, one W-2 (wages 50,000 / withheld 6,000):");
   expectEq("line_24", out.f1040.line_24, 3872);
   expectEq("line_25a", out.f1040.line_25a, 6000);
   expectEq("line_34 (refund)", out.f1040.line_34, 2128);
-  expectEq("line_37 (owed)", out.f1040.line_37, 0);
+  // BLANK-vs-ZERO: inapplicable lines stay absent (blank on the form).
+  expectEq("line_37 BLANK on a refund return", out.f1040.line_37, undefined);
+  expectEq("line_8 BLANK (no business)", out.f1040.line_8, undefined);
+  expectEq("line_17 BLANK (parked)", out.f1040.line_17, undefined);
+  expectEq("line_19 BLANK (no dependents)", out.f1040.line_19, undefined);
+  expectEq("line_23 BLANK (no SE)", out.f1040.line_23, undefined);
+  expectEq("line_26 BLANK (not collected)", out.f1040.line_26, undefined);
+  expectEq("line_27a BLANK (EIC not computed)", out.f1040.line_27a, undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +107,11 @@ console.log("GOLDEN 3 — Single SENIOR (b.1955), business only +30,000, no W-2:
   expectEq("line_16", out.f1040.line_16, 331);
   expectEq("line_24", out.f1040.line_24, 4569);
   expectEq("line_37 (owed)", out.f1040.line_37, 4569);
+  // BLANK-vs-ZERO: a business-only filer has no wage/withholding/refund lines.
+  expectEq("line_1a BLANK (no W-2)", out.f1040.line_1a, undefined);
+  expectEq("line_25a BLANK (no W-2)", out.f1040.line_25a, undefined);
+  expectEq("line_34 BLANK on an owed return", out.f1040.line_34, undefined);
+  expectEq("line_23 SET (SE applies)", out.f1040.line_23, 4238);
 }
 
 // ---------------------------------------------------------------------------

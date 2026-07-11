@@ -17,6 +17,26 @@ const { computeAll } = require("../taxEngine");
 
 const SAFE_COL = /^(line|s1|se|f2441)_[0-9a-z]+$/;
 
+// Every 1040/2441 column the engine MANAGES. On each recompute, managed
+// columns absent from the output are set back to NULL — blank-vs-zero rule:
+// an inapplicable line must show BLANK on the filled form, and stale values
+// from an earlier compute must never linger.
+const ENGINE_1040_COLS = [
+  "line_1a", "line_1e", "line_1z", "line_8", "line_9", "line_10",
+  "line_11a", "line_11b", "line_12e", "line_13a", "line_13b", "line_14",
+  "line_15", "line_16", "line_17", "line_18", "line_19", "line_20",
+  "line_21", "line_22", "line_23", "line_24", "line_25a", "line_25b",
+  "line_25d", "line_26", "line_27a", "line_28", "line_32", "line_33",
+  "line_34", "line_35a", "line_37",
+];
+const F2441_COLS = [
+  "f2441_3", "f2441_4", "f2441_5", "f2441_6", "f2441_7", "f2441_8",
+  "f2441_9a", "f2441_9c", "f2441_10", "f2441_11", "f2441_12", "f2441_15",
+  "f2441_16", "f2441_17", "f2441_18", "f2441_19", "f2441_20", "f2441_21",
+  "f2441_23", "f2441_24", "f2441_25", "f2441_26", "f2441_27", "f2441_28",
+  "f2441_29", "f2441_30", "f2441_31",
+];
+
 function parseJson(s, fallback) {
   if (s === null || s === undefined) return fallback;
   try {
@@ -130,7 +150,8 @@ async function loadSnapshot(pool, oid, taxYear) {
 }
 
 // Upsert one computed row; only whitelisted numeric columns are written.
-async function upsertComputed(pool, table, oid, taxYear, values, flagsJson) {
+// `allCols` (optional): managed columns NOT in `values` are reset to NULL.
+async function upsertComputed(pool, table, oid, taxYear, values, flagsJson, allCols) {
   const cols = Object.entries(values).filter(
     ([k, v]) => SAFE_COL.test(k) && Number.isFinite(Number(v)),
   );
@@ -138,7 +159,14 @@ async function upsertComputed(pool, table, oid, taxYear, values, flagsJson) {
   cols.forEach(([k, v], i) => req.input(`p${i}`, sql.Decimal(18, 2), Number(v)));
   if (flagsJson !== undefined) req.input("flags", sql.NVarChar(sql.MAX), flagsJson);
 
-  const setList = cols.map(([k], i) => `${k} = @p${i}`).join(", ");
+  const present = new Set(cols.map(([k]) => k));
+  const nullSet = (allCols || [])
+    .filter((c) => SAFE_COL.test(c) && !present.has(c))
+    .map((c) => `${c} = NULL`)
+    .join(", ");
+  const setList = [cols.map(([k], i) => `${k} = @p${i}`).join(", "), nullSet]
+    .filter(Boolean)
+    .join(", ");
   const insCols = cols.map(([k]) => k).join(", ");
   const insVals = cols.map((_, i) => `@p${i}`).join(", ");
   const flagsSet = flagsJson !== undefined ? "flags = @flags," : "";
@@ -243,11 +271,11 @@ app.http("calc1040", {
       }
 
       const flagsJson = JSON.stringify(out.flags);
-      await upsertComputed(pool, "raul_tax_form_1040", oid, taxYear, out.f1040, flagsJson);
+      await upsertComputed(pool, "raul_tax_form_1040", oid, taxYear, out.f1040, flagsJson, ENGINE_1040_COLS);
       await upsertComputed(pool, "raul_tax_schedule1", oid, taxYear, out.s1);
       await upsertComputed(pool, "raul_tax_schedule_se", oid, taxYear, out.se);
       if (out.f2441 && Object.keys(out.f2441).length > 0) {
-        await upsertComputed(pool, "raul_tax_form_2441", oid, taxYear, out.f2441);
+        await upsertComputed(pool, "raul_tax_form_2441", oid, taxYear, out.f2441, undefined, F2441_COLS);
       } else {
         // The 2441 module didn't run this time — clear any stale prior result
         // (line 1e must return to NULL = "never computed", not keep old data).

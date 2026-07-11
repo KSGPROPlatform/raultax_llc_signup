@@ -115,8 +115,12 @@ function computeAll(snapshot) {
   }
 
   // ------------------------------ Line 1 ------------------------------------
+  // BLANK-vs-ZERO rule (Doane 2026-07-11): a line is SET only when it applies
+  // to this return — an unused line stays absent (NULL -> blank on the filled
+  // form). 0 is written only when the computation really produced zero.
   const f1040 = {};
-  f1040.line_1a = r(sum(w2s, (w) => w.box1)); // Σ box 1, year-scoped, verified docs
+  const wages1a = r(sum(w2s, (w) => w.box1)); // Σ box 1, year-scoped, verified docs
+  if (w2s.length > 0) f1040.line_1a = wages1a;
   // 1b–1i parked (NULL). 1e is set by Form 2441 Part III below; 1z after it.
 
   // --------------------------- Schedule SE (early: feeds AGI) ---------------
@@ -164,7 +168,7 @@ function computeAll(snapshot) {
   const ran2441 = box10Total > 0 || careExpensesTotal > 0;
   // Earned income, v1 definition (see ledger): W-2 box 1 wages + net SE
   // earnings − ½ SE tax; taxable benefits NOT added back (conservative).
-  const earnedSelf = Math.max(0, f1040.line_1a + (seApplies ? se.se_6 - se.se_13 : 0));
+  const earnedSelf = Math.max(0, wages1a + (seApplies ? se.se_6 - se.se_13 : 0));
   const spouseEarned = num(snapshot.spouseEarnedIncome);
   const expenseCap =
     qualifyingPersons.length >= 2 ? rules.f2441.expenseCapTwoPlus : rules.f2441.expenseCapOne;
@@ -234,13 +238,17 @@ function computeAll(snapshot) {
     }
   }
   // 1z sums 1a–1h with NULLs as 0 (1e only when Form 2441 produced it):
-  f1040.line_1z = f1040.line_1a + (f1040.line_1e ?? 0);
+  const wagesTotal = wages1a + (f1040.line_1e ?? 0);
+  if (w2s.length > 0 || f1040.line_1e !== undefined) f1040.line_1z = wagesTotal;
 
   // --------------------------- Income totals / AGI --------------------------
-  f1040.line_8 = s1.s1_10;
-  f1040.line_9 = f1040.line_1z + f1040.line_8; // 2b,3b,4b,5b,6b,7a NULL -> 0
-  f1040.line_10 = s1.s1_26;
-  f1040.line_11a = f1040.line_9 - f1040.line_10;
+  // Lines 8/10 belong to Schedule 1 — blank when there's no business at all.
+  if (companies.length > 0) {
+    f1040.line_8 = s1.s1_10;
+    f1040.line_10 = s1.s1_26;
+  }
+  f1040.line_9 = wagesTotal + s1.s1_10; // 2b,3b,4b,5b,6b,7a NULL -> 0
+  f1040.line_11a = f1040.line_9 - s1.s1_26;
   f1040.line_11b = f1040.line_11a;
 
   // --------------------------- Deductions (12e, 13a, 13b) -------------------
@@ -261,10 +269,11 @@ function computeAll(snapshot) {
   );
   // Married taxpayers must file JOINTLY to claim it (form caution).
   const seniorEligibleSelf = selfSenior && st !== "mfs";
-  f1040.line_13b = (seniorEligibleSelf ? seniorAmt : 0) + (spouseSenior ? seniorAmt : 0);
+  const seniorTotal = (seniorEligibleSelf ? seniorAmt : 0) + (spouseSenior ? seniorAmt : 0);
+  if (seniorTotal > 0) f1040.line_13b = seniorTotal; // blank unless it applies
 
   // Form 8995 QBI (needs taxable income BEFORE the QBI deduction).
-  const taxableBeforeQbi = Math.max(0, f1040.line_11b - f1040.line_12e - f1040.line_13b);
+  const taxableBeforeQbi = Math.max(0, f1040.line_11b - f1040.line_12e - seniorTotal);
   let qbiDeduction = 0;
   if (businessNet > 0) {
     if (taxableBeforeQbi > rules.qbi.taxableIncomeLimit[st]) {
@@ -279,15 +288,15 @@ function computeAll(snapshot) {
   } else if (businessNet < 0) {
     flags.push(`Business net is a loss ($${businessNet}) — QBI loss carryforward to next year (preparer note).`);
   }
-  f1040.line_13a = qbiDeduction;
+  if (companies.length > 0) f1040.line_13a = qbiDeduction; // blank without a business
 
-  f1040.line_14 = f1040.line_12e + f1040.line_13a + f1040.line_13b;
+  f1040.line_14 = f1040.line_12e + qbiDeduction + seniorTotal;
   f1040.line_15 = Math.max(0, f1040.line_11b - f1040.line_14);
 
   // ------------------------------- Tax (16–18) ------------------------------
   f1040.line_16 = bracketTax(f1040.line_15, rules.brackets[st]);
-  f1040.line_17 = 0; // Schedule 2 Part I parked
-  f1040.line_18 = f1040.line_16 + f1040.line_17;
+  // line 17 (Schedule 2 Part I) is parked — stays BLANK, not 0.
+  f1040.line_18 = f1040.line_16;
 
   // ------------------- Form 2441 Part II (credit) → Sch 3 line 2 ------------
   // MFS can't take the credit (form line A) — preparer applies the exception.
@@ -342,7 +351,7 @@ function computeAll(snapshot) {
       const l16a = l12 - line19;
       const l16b = qc.length * rules.ctc.actcPerChild;
       const l17 = Math.min(l16a, l16b);
-      const earned = Math.max(0, f1040.line_1z + s1.s1_3 - s1.s1_15);
+      const earned = Math.max(0, wagesTotal + s1.s1_3 - s1.s1_15);
       const l19x = Math.max(0, earned - rules.ctc.actcEarnedIncomeFloor);
       const l20 = r(l19x * rules.ctc.actcRate);
       if (l16b >= rules.ctc.actcPartIIBThreshold && l20 < l17) {
@@ -354,30 +363,44 @@ function computeAll(snapshot) {
     }
     // Residency/support confirmations are preparer's (form caution).
   }
-  f1040.line_19 = line19;
-  f1040.line_20 = s3_2; // Schedule 3 line 8 = line 2 (2441 credit; 8839 etc. later)
-  f1040.line_21 = f1040.line_19 + f1040.line_20;
-  f1040.line_22 = Math.max(0, f1040.line_18 - f1040.line_21);
-  f1040.line_23 = se.se_12; // Schedule 2 line 21 v1 = SE tax
-  f1040.line_24 = f1040.line_22 + f1040.line_23;
+  // Credit lines apply only when their schedules exist on this return.
+  if (dependents.length > 0) f1040.line_19 = line19;
+  if (ran2441) f1040.line_20 = s3_2; // Schedule 3 line 8 = line 2
+  const credits21 = line19 + s3_2;
+  if (dependents.length > 0 || ran2441) f1040.line_21 = credits21;
+  f1040.line_22 = Math.max(0, f1040.line_18 - credits21); // form: "-0-" if zero
+  if (seApplies) f1040.line_23 = se.se_12; // Schedule 2 line 21 v1 = SE tax
+  f1040.line_24 = f1040.line_22 + se.se_12;
 
   // --------------------------- Payments (25–33) -----------------------------
-  f1040.line_25a = r(sum(w2s, (w) => w.box2));
-  f1040.line_25b = r(sum(f1099s, (n) => n.withheld));
-  f1040.line_25d = f1040.line_25a + f1040.line_25b; // 25c parked
-  f1040.line_26 = num(snapshot.estimatedPayments);
-  f1040.line_27a = 0; // EIC: flag-only in v1
+  const w2Withheld = r(sum(w2s, (w) => w.box2));
+  const n99Withheld = r(sum(f1099s, (n) => n.withheld));
+  if (w2s.length > 0) f1040.line_25a = w2Withheld;
+  if (f1099s.length > 0) f1040.line_25b = n99Withheld;
+  f1040.line_25d = w2Withheld + n99Withheld; // 25c parked
+  const estPay = num(snapshot.estimatedPayments);
+  if (snapshot.estimatedPayments !== null && snapshot.estimatedPayments !== undefined) {
+    f1040.line_26 = estPay; // blank until the input is actually collected
+  }
+  // line 27a (EIC) is NOT computed in v1 — stays blank; the flag says why.
   if (f1040.line_11a < rules.eicFlagAgiCeiling && (qc.length > 0 || f1040.line_11a < 20000)) {
     flags.push("Possible EIC eligibility (heuristic) — preparer review (line 27a).");
   }
-  f1040.line_28 = line28;
-  f1040.line_32 = f1040.line_27a + f1040.line_28; // 29,30,31 parked -> 0
-  f1040.line_33 = f1040.line_25d + f1040.line_26 + f1040.line_32;
+  if (dependents.length > 0) {
+    f1040.line_28 = line28;
+    f1040.line_32 = line28; // 27a blank; 29,30,31 parked
+  }
+  f1040.line_33 = f1040.line_25d + estPay + line28;
 
   // --------------------------- Refund / owed (34–37) ------------------------
-  f1040.line_34 = Math.max(0, f1040.line_33 - f1040.line_24);
-  f1040.line_35a = f1040.line_34; // line 36 split parked
-  f1040.line_37 = Math.max(0, f1040.line_24 - f1040.line_33);
+  // Only ONE side of the outcome is ever filled — the other stays blank, the
+  // way a preparer fills the paper form (a printed 0 reads as a declaration).
+  if (f1040.line_33 > f1040.line_24) {
+    f1040.line_34 = f1040.line_33 - f1040.line_24;
+    f1040.line_35a = f1040.line_34; // line 36 split parked
+  } else if (f1040.line_24 > f1040.line_33) {
+    f1040.line_37 = f1040.line_24 - f1040.line_33;
+  }
 
   return {
     supported: true,

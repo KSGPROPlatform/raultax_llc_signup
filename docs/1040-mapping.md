@@ -12,6 +12,17 @@ starts only from what is written here.
   (e.g. 1f). The 1040 uses **whole dollars** — round per IRS rules at output.
 - **NULL vs 0**: `NULL` = "never collected / not applicable yet";
   `0` = "known to be zero". Sum lines treat NULL as 0.
+- **BLANK-vs-ZERO on the filled form (Doane 2026-07-11)**: the engine SETS a
+  line only when it applies to the return — inapplicable lines stay NULL and
+  render BLANK everywhere (PDF, user page, admin panel shows "—", still
+  overridable). A printed 0 reads as a declaration of zero, so: no W-2 → 1a/25a
+  blank; no business → 8/10/13a/23 blank; no dependents → 19/28/32 blank; no
+  2441 → 1e/20 blank; estimated payments not collected → 26 blank; EIC not
+  computed → 27a blank; parked 17 blank; refund and owed are EITHER/OR — the
+  other side stays blank. Exception: lines the form marks "-0-" when zero
+  (15, 22) and core totals (9, 11a/11b, 12e, 14, 16, 18, 24, 25d, 33) always
+  print. Each recompute NULL-clears managed columns absent from the output
+  (calc1040 ENGINE_1040_COLS / F2441_COLS) so stale values never linger.
 - **One deployed `calc1040` Azure Function**, internally one **small named
   function per line** (`line1a()`, `line1z()`, …). One data load per run (the
   year's snapshot: W-2/1099 extractions, P&L, dependents, spouse, declaration);

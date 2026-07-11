@@ -196,7 +196,8 @@ export function TaxReturnReview({ oid }: { oid: string }) {
             {LINES.map(([key, label]) => {
               const computed = row[key];
               const ov = overrides[key];
-              if (!Number.isFinite(Number(computed)) && !ov) return null;
+              // Blank lines stay visible ("—") — the preparer can still
+              // override them (blank = not applicable, NOT zero).
               const isEditing = editing === key;
               const strong = FORM_1040_STRONG.has(key);
               return (
