@@ -176,7 +176,12 @@ fully excluded). Runs when Σ box 10 > 0 OR any dependent has care expenses.**
 *New inputs:* per-dependent `care_expenses` (qualified expenses paid in the
 year) + `is_disabled` (form 2(c): over-12 and unable to self-care); care
 providers table (Part I: name, address, SSN/EIN, household-employee?, amount);
-spouse `earned_income` (form lines 5/19, MFJ). Qualifying person = dependent
+spouse `earned_income` (form lines 5/19, MFJ).
+**Part I workflow (Doane, 2026-07-12): provider details are NOT captured in
+the app** — the UI section was removed; the PREPARER collects the provider's
+name/address/tax ID from the client at filing (the engine flags every 2441
+return as a reminder). Backend (table, careProviders function, API routes,
+snapshot loader) kept intact for re-enabling later. Qualifying person = dependent
 under 13 (13th birthday > Jan 1 of year; turned-13-mid-year → flag: only
 pre-birthday expenses qualify) OR `is_disabled`.
 
