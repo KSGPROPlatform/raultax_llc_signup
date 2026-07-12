@@ -8,6 +8,7 @@ import {
   Trash2,
   UploadCloud,
   Smartphone,
+  Camera,
   Loader2,
   CheckCircle2,
   Sparkles,
@@ -17,6 +18,7 @@ import {
 import type { UserFile, Extraction } from "@/lib/files";
 import { DOC_ACCEPT, isExtractable } from "@/lib/docTypes";
 import { maskTail } from "@/components/profile/mask";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 type Qr = { url: string; qrDataUrl: string; expiresInSec: number };
 type AnalyzeState = "idle" | "reading" | "done" | "unsupported" | "error";
@@ -102,7 +104,9 @@ export function DocUpload({
   const [showFields, setShowFields] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const extractable = isExtractable(docType);
+  const isMobile = useIsMobile();
 
   const refresh = useCallback(async (): Promise<UserFile | null> => {
     try {
@@ -354,6 +358,7 @@ export function DocUpload({
         </div>
       )}
 
+      {/* File picker (any image or PDF). */}
       <input
         ref={inputRef}
         type="file"
@@ -364,24 +369,49 @@ export function DocUpload({
           e.target.value = "";
         }}
       />
-      <div className="mt-2 flex flex-wrap gap-2">
+      {/* Camera capture — `capture="environment"` makes phones open the rear
+          camera straight away instead of the file browser. */}
+      <input
+        ref={cameraRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          upload(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+        {/* On phones, offer the camera first — snapping the document is the
+            fastest path. Hidden on desktop where there's usually no camera. */}
+        {isMobile && (
+          <button
+            type="button"
+            disabled={busy || Boolean(disabledReason)}
+            onClick={() => cameraRef.current?.click()}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+          >
+            <Camera className="h-3.5 w-3.5" /> Take photo
+          </button>
+        )}
         <button
           type="button"
           disabled={busy || Boolean(disabledReason)}
           onClick={() => inputRef.current?.click()}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 sm:py-1.5 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
         >
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UploadCloud className="h-3.5 w-3.5" />}
-          {busy ? "Uploading…" : file ? "Replace" : "Upload"}
+          {busy ? "Uploading…" : file ? "Replace file" : isMobile ? "Upload file" : "Upload"}
         </button>
         <button
           type="button"
           disabled={qrLoading || Boolean(disabledReason)}
           onClick={() => (qr ? setQr(null) : openPhone())}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 sm:py-1.5 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
         >
           {qr ? <X className="h-3.5 w-3.5" /> : <Smartphone className="h-3.5 w-3.5" />}
-          {qr ? "Close" : qrLoading ? "…" : "Use phone"}
+          {qr ? "Close" : qrLoading ? "…" : isMobile ? "Another phone" : "Use phone"}
         </button>
       </div>
 

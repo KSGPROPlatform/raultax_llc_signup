@@ -138,18 +138,21 @@ export function AdminOverview() {
           </div>
         </div>
 
+        {/* On phones, low-priority columns (email, counts, joined) are hidden so
+            the essentials fit without sideways scrolling; they reappear at md.
+            The overflow wrapper stays as a fallback for in-between widths. */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
+          <table className="w-full text-left text-sm md:min-w-[760px]">
             <thead>
               <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
                 <th scope="col" className="px-4 py-3 font-medium">Name</th>
-                <th scope="col" className="px-4 py-3 font-medium">Email</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium md:table-cell">Email</th>
                 <th scope="col" className="px-4 py-3 font-medium">Role</th>
                 <th scope="col" className="px-4 py-3 font-medium">Onboarding</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Cos.</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Deps.</th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">Docs</th>
-                <th scope="col" className="px-4 py-3 font-medium">Joined</th>
+                <th scope="col" className="hidden px-4 py-3 text-right font-medium md:table-cell">Cos.</th>
+                <th scope="col" className="hidden px-4 py-3 text-right font-medium md:table-cell">Deps.</th>
+                <th scope="col" className="hidden px-4 py-3 text-right font-medium md:table-cell">Docs</th>
+                <th scope="col" className="hidden px-4 py-3 font-medium md:table-cell">Joined</th>
                 <th scope="col" className="px-4 py-3" />
               </tr>
             </thead>
@@ -172,7 +175,7 @@ export function AdminOverview() {
                 filtered.map((u) => (
                   <tr key={u.entra_object_id} className="border-b border-zinc-100 last:border-0 hover:bg-zinc-50 dark:border-zinc-800/60 dark:hover:bg-zinc-900/40">
                     <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">{u.name || "—"}</td>
-                    <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{u.email || "—"}</td>
+                    <td className="hidden px-4 py-3 text-zinc-500 md:table-cell dark:text-zinc-400">{u.email || "—"}</td>
                     <td className="px-4 py-3"><RoleBadge role={u.role} /></td>
                     <td className="px-4 py-3">
                       {u.onboarding_completed ? (
@@ -185,10 +188,10 @@ export function AdminOverview() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-300">{u.companies}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-300">{u.dependents}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-zinc-600 dark:text-zinc-300">{u.documents}</td>
-                    <td className="px-4 py-3 tabular-nums text-zinc-500 dark:text-zinc-400">{fmtDate(u.created_at)}</td>
+                    <td className="hidden px-4 py-3 text-right tabular-nums text-zinc-600 md:table-cell dark:text-zinc-300">{u.companies}</td>
+                    <td className="hidden px-4 py-3 text-right tabular-nums text-zinc-600 md:table-cell dark:text-zinc-300">{u.dependents}</td>
+                    <td className="hidden px-4 py-3 text-right tabular-nums text-zinc-600 md:table-cell dark:text-zinc-300">{u.documents}</td>
+                    <td className="hidden px-4 py-3 tabular-nums text-zinc-500 md:table-cell dark:text-zinc-400">{fmtDate(u.created_at)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Camera, CheckCircle2, Loader2 } from "lucide-react";
+import { Camera, CheckCircle2, Loader2, FileUp } from "lucide-react";
 
 // Phone-side uploader for /m/<token>. The token already encodes WHICH document
 // (and job) this is for, so the phone just snaps/picks a file and it lands in
@@ -76,20 +76,38 @@ export function MobileUpload({ token, label }: { token: string; label: string })
           </p>
         )}
 
-        <label className="mt-6 flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-4 text-base font-semibold text-zinc-950 transition-colors hover:bg-amber-400">
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            hidden
-            disabled={busy}
-            onChange={(e) => {
-              upload(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-          {busy ? "Uploading…" : "Take photo or choose file"}
-        </label>
+        <div className="mt-6 space-y-3">
+          {/* Camera first — the fast path on a phone. capture="environment"
+              opens the rear camera directly. */}
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-4 text-base font-semibold text-zinc-950 transition-colors hover:bg-amber-400">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              disabled={busy}
+              onChange={(e) => {
+                upload(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+            {busy ? "Uploading…" : "Take a photo"}
+          </label>
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-4 text-base font-semibold text-zinc-700 transition-colors hover:bg-zinc-100">
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              hidden
+              disabled={busy}
+              onChange={(e) => {
+                upload(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <FileUp className="h-5 w-5" /> Choose a file
+          </label>
+        </div>
       </div>
     </main>
   );

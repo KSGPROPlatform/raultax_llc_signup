@@ -113,7 +113,7 @@ function PasswordStrengthMeter({ pw }: { pw: string }) {
           {label}
         </span>
       </div>
-      <ul className="grid grid-cols-2 gap-x-3 gap-y-1">
+      <ul className="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-3">
         {rules.map((r) => (
           <li
             key={r.text}
