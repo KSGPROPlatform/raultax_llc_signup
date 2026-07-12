@@ -187,7 +187,7 @@ function computeAll(snapshot) {
       }
     }
     if ((snapshot.careProviders || []).length === 0) {
-      flags.push("Form 2441 Part I is mandatory — no care provider on file (name, address, tax ID, amount). Ask the client to add the provider.");
+      flags.push("Form 2441 Part I (care provider name, address, tax ID, amount) — collect from the client at filing; the app doesn't capture it.");
     }
     if (seApplies) {
       flags.push("Form 2441 earned income includes self-employment (net earnings − ½ SE tax) — preparer verify (v1 definition).");

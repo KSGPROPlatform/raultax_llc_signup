@@ -9,7 +9,6 @@ import {
   listDeclarations,
   getSpouse,
   listDependents,
-  listCareProviders,
   listBankAccounts,
   listJobs,
   listCompanies,
@@ -37,13 +36,12 @@ export default async function DeclarationReviewPage({
   if (!isAllowedTaxYear(raw)) redirect("/dashboard/user");
   const year = Number(raw);
 
-  const [profile, decls, spouse, dependents, careProviders, banks, jobs, companies, files, ret] =
+  const [profile, decls, spouse, dependents, banks, jobs, companies, files, ret] =
     await Promise.all([
       getUserProfile(user.sub),
       listDeclarations(user.sub),
       getSpouse(user.sub, year),
       listDependents(user.sub, year),
-      listCareProviders(user.sub, year),
       listBankAccounts(user.sub, year),
       listJobs(user.sub, year),
       listCompanies(user.sub, year),
@@ -129,14 +127,6 @@ export default async function DeclarationReviewPage({
         relationship: d.relationship ?? "",
         careExpenses: d.care_expenses ?? null,
         isDisabled: Boolean(d.is_disabled),
-      }))}
-      careProviders={careProviders.map((p) => ({
-        id: p.id,
-        name: p.provider_name ?? "",
-        address: p.address ?? "",
-        taxId: p.tax_id ?? "",
-        amountPaid: p.amount_paid ?? null,
-        householdEmployee: Boolean(p.is_household_employee),
       }))}
       banks={banks.map((b) => ({
         id: b.id,

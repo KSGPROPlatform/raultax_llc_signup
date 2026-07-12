@@ -153,7 +153,7 @@ console.log("GOLDEN 4 — Form 2441 MFJ: box 10 = 5,000 FULLY EXCLUDED (1e = 0):
   expectEq("line_28 (ACTC)", out.f1040.line_28, 1657);
   expectEq("line_22", out.f1040.line_22, 0);
   expectEq("line_34 (refund)", out.f1040.line_34, 5657);
-  expectEq("no provider flag (provider on file)", out.flags.some((f) => f.includes("Part I is mandatory")), false);
+  expectEq("no provider flag (provider on file)", out.flags.some((f) => f.includes("Form 2441 Part I")), false);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ console.log("GUARDS:");
   expectEq("2441 trigger flagged (box 10)", trigger.flags.some((f) => f.includes("2441")), true);
   // Box 10 with NO care details: everything taxable + provider flag.
   expectEq("box10 w/o expenses -> 1e all taxable", trigger.f1040.line_1e, 3000);
-  expectEq("box10 w/o provider -> Part I flag", trigger.flags.some((f) => f.includes("Part I is mandatory")), true);
+  expectEq("box10 w/o provider -> Part I flag", trigger.flags.some((f) => f.includes("Form 2441 Part I")), true);
   // MFJ with box 10 but NO spouse earned income: conservative + explicit flag.
   const noSpouse = computeAll({
     taxYear: 2025, filingStatus: "Married filing jointly", birthDateSelf: "01/01/1990",

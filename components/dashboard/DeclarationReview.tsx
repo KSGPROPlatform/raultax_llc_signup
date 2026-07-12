@@ -25,7 +25,6 @@ import { useToast } from "@/components/ui/Toast";
 import { PersonalInfoForm, type PersonalInfoValues } from "@/components/profile/PersonalInfoForm";
 import { SpouseSection } from "@/components/dashboard/SpouseSection";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
-import { CareProvidersSection } from "@/components/dashboard/CareProvidersSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { JobsSection } from "@/components/dashboard/JobsSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
@@ -46,7 +45,6 @@ export type DeclarationReviewProps = {
   ownsEstablishment: boolean | null;
   spouse: { firstName: string; lastName: string; dateOfBirth: string; ssn: string; earnedIncome: Money } | null;
   dependents: { id: number; fullName: string; ssn: string; dateOfBirth: string; relationship: string; careExpenses: Money; isDisabled: boolean }[];
-  careProviders: { id: number; name: string; address: string; taxId: string; amountPaid: Money; householdEmployee: boolean }[];
   banks: { id: number; bankName: string; accountNumber: string; routingNumber: string }[];
   jobs: { id: number; occupation: string; companyName: string }[];
   companies: { id: number; companyName: string; ein: string; activities: string; net: Money }[];
@@ -60,7 +58,7 @@ const money = (v: Money) =>
     : Number(v).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export function DeclarationReview(props: DeclarationReviewProps) {
-  const { year, status, filingStatus, profile, spouse, dependents, careProviders, banks, jobs, companies, documents, outcome } = props;
+  const { year, status, filingStatus, profile, spouse, dependents, banks, jobs, companies, documents, outcome } = props;
   const router = useRouter();
   const toast = useToast();
   const [editing, setEditing] = useState(Boolean(props.initialEditing));
@@ -257,53 +255,25 @@ export function DeclarationReview(props: DeclarationReviewProps) {
 
       {/* Dependents */}
       {showDependents && (
-        <SectionCard icon={Baby} title="Dependents & childcare">
+        <SectionCard icon={Baby} title="Dependents">
           {editing ? (
-            <div className="space-y-8">
-              <DependentsSection />
-              <CareProvidersSection />
-            </div>
+            <DependentsSection />
+          ) : dependents.length ? (
+            <ItemList
+              items={dependents.map((d) => ({
+                id: d.id,
+                title: d.fullName || "—",
+                sub: [
+                  d.relationship || "—",
+                  `SSN ${maskTail(d.ssn)}`,
+                  d.dateOfBirth || "—",
+                  Number(d.careExpenses) > 0 ? `care ${money(d.careExpenses)}` : null,
+                  d.isDisabled ? "disabled" : null,
+                ].filter(Boolean).join(" · "),
+              }))}
+            />
           ) : (
-            <div className="space-y-5">
-              <div>
-                <SubHeading>Dependents ({dependents.length})</SubHeading>
-                {dependents.length ? (
-                  <ItemList
-                    items={dependents.map((d) => ({
-                      id: d.id,
-                      title: d.fullName || "—",
-                      sub: [
-                        d.relationship || "—",
-                        `SSN ${maskTail(d.ssn)}`,
-                        d.dateOfBirth || "—",
-                        Number(d.careExpenses) > 0 ? `care ${money(d.careExpenses)}` : null,
-                        d.isDisabled ? "disabled" : null,
-                      ].filter(Boolean).join(" · "),
-                    }))}
-                  />
-                ) : (
-                  <EmptyNote>No dependents added.</EmptyNote>
-                )}
-              </div>
-              <div>
-                <SubHeading>Childcare providers ({careProviders.length})</SubHeading>
-                {careProviders.length ? (
-                  <ItemList
-                    items={careProviders.map((p) => ({
-                      id: p.id,
-                      title: p.name || "—",
-                      sub: [
-                        p.householdEmployee ? "Household employee" : "Care organization",
-                        p.taxId ? `Tax ID ${maskTail(p.taxId)}` : null,
-                        Number(p.amountPaid) > 0 ? `paid ${money(p.amountPaid)}` : null,
-                      ].filter(Boolean).join(" · "),
-                    }))}
-                  />
-                ) : (
-                  <EmptyNote>No childcare providers added.</EmptyNote>
-                )}
-              </div>
-            </div>
+            <EmptyNote>No dependents added.</EmptyNote>
           )}
         </SectionCard>
       )}

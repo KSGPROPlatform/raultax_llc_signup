@@ -13,7 +13,6 @@ import { SelectField } from "@/components/forms/Field";
 import { allowedTaxYears } from "@/lib/taxYear";
 import type { Declaration } from "@/lib/profileData";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
-import { CareProvidersSection } from "@/components/dashboard/CareProvidersSection";
 import { BankSection } from "@/components/dashboard/BankSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
 import { JobsSection } from "@/components/dashboard/JobsSection";
@@ -364,12 +363,7 @@ function OnboardingFlow() {
             {currentKey === "spouse" && (
               <SpouseSection mode={spouseMode} onStatusChange={markSpouse} />
             )}
-            {currentKey === "dependents" && (
-              <div className="space-y-8">
-                <DependentsSection />
-                <CareProvidersSection />
-              </div>
-            )}
+            {currentKey === "dependents" && <DependentsSection />}
             {currentKey === "bank" && <BankSection onStatusChange={markBank} />}
             {currentKey === "jobs" && <JobsSection />}
             {currentKey === "business" && (
