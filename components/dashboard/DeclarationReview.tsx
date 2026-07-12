@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Loader2,
   FileDown,
+  Eye,
 } from "lucide-react";
 import { maskTail } from "@/components/profile/mask";
 import { useToast } from "@/components/ui/Toast";
@@ -156,7 +157,7 @@ export function DeclarationReview(props: DeclarationReviewProps) {
               )}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {approved && (
               <a
                 href={`/api/tax-return/pdf?year=${year}`}
@@ -299,22 +300,50 @@ export function DeclarationReview(props: DeclarationReviewProps) {
       <SectionCard icon={Briefcase} title="Jobs & wage documents">
         {editing ? (
           <JobsSection />
-        ) : jobs.length ? (
-          <ItemList
-            items={jobs.map((j) => ({
-              id: j.id,
-              title: j.occupation || "—",
-              sub: [
-                j.companyName || "—",
-                (() => {
-                  const n = documents.filter((doc) => doc.jobId === j.id).length;
-                  return n ? `${n} document${n > 1 ? "s" : ""}` : "no documents yet";
-                })(),
-              ].join(" · "),
-            }))}
-          />
         ) : (
-          <EmptyNote>No jobs added.</EmptyNote>
+          <div className="space-y-5">
+            {jobs.length ? (
+              <ItemList
+                items={jobs.map((j) => ({
+                  id: j.id,
+                  title: j.occupation || "—",
+                  sub: [
+                    j.companyName || "—",
+                    (() => {
+                      const n = documents.filter((doc) => doc.jobId === j.id).length;
+                      return n ? `${n} document${n > 1 ? "s" : ""}` : "no documents yet";
+                    })(),
+                  ].join(" · "),
+                }))}
+              />
+            ) : (
+              <EmptyNote>No jobs added.</EmptyNote>
+            )}
+            {(() => {
+              const wageDocs = documents.filter((d) =>
+                ["w2", "form_1099"].includes(d.docType ?? ""),
+              );
+              if (!wageDocs.length) return null;
+              const jobName = (id: number | null) =>
+                jobs.find((j) => j.id === id)?.companyName || null;
+              return (
+                <div>
+                  <SubHeading>Wage documents ({wageDocs.length})</SubHeading>
+                  <ItemList
+                    items={wageDocs.map((d) => ({
+                      id: d.id,
+                      title: [docLabel(d.docType), jobName(d.jobId)].filter(Boolean).join(" — "),
+                      sub: d.name,
+                      href: `/api/files/${d.id}`,
+                    }))}
+                  />
+                  <p className="mt-1.5 text-[11px] text-zinc-400">
+                    Tap a document to view it. To replace or remove one, use Edit.
+                  </p>
+                </div>
+              );
+            })()}
+          </div>
         )}
       </SectionCard>
 
@@ -356,9 +385,19 @@ export function DeclarationReview(props: DeclarationReviewProps) {
               ["ssn_copy", "spouse_ssn_copy"].includes(d.docType ?? ""),
             );
             return idDocs.length ? (
-              <ItemList
-                items={idDocs.map((d) => ({ id: d.id, title: docLabel(d.docType), sub: d.name }))}
-              />
+              <div>
+                <ItemList
+                  items={idDocs.map((d) => ({
+                    id: d.id,
+                    title: docLabel(d.docType),
+                    sub: d.name,
+                    href: `/api/files/${d.id}`,
+                  }))}
+                />
+                <p className="mt-1.5 text-[11px] text-zinc-400">
+                  Tap a document to view it. To replace or remove one, use Edit.
+                </p>
+              </div>
             ) : (
               <EmptyNote>No identity documents uploaded.</EmptyNote>
             );
@@ -373,6 +412,8 @@ function docLabel(t: string | null): string {
   switch (t) {
     case "ssn_copy": return "SSN document";
     case "spouse_ssn_copy": return "Spouse SSN document";
+    case "w2": return "W-2";
+    case "form_1099": return "1099";
     default: return "Document";
   }
 }
@@ -436,13 +477,36 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ItemList({ items }: { items: { id: number; title: string; sub: string }[] }) {
+function ItemList({
+  items,
+}: {
+  items: { id: number; title: string; sub: string; href?: string }[];
+}) {
   return (
     <ul className="divide-y divide-zinc-100 overflow-hidden rounded-lg border border-zinc-200 dark:divide-zinc-800/60 dark:border-zinc-800">
       {items.map((it) => (
-        <li key={it.id} className="px-3.5 py-2.5">
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">{it.title}</p>
-          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{it.sub}</p>
+        <li key={it.id}>
+          {it.href ? (
+            <a
+              href={it.href}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between gap-3 px-3.5 py-2.5 transition-colors hover:bg-amber-50/60 dark:hover:bg-amber-500/5"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">{it.title}</span>
+                <span className="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400">{it.sub}</span>
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                <Eye className="h-3.5 w-3.5" /> View
+              </span>
+            </a>
+          ) : (
+            <div className="px-3.5 py-2.5">
+              <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">{it.title}</p>
+              <p className="mt-0.5 truncate text-xs text-zinc-500 dark:text-zinc-400">{it.sub}</p>
+            </div>
+          )}
         </li>
       ))}
     </ul>
