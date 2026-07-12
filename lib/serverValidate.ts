@@ -325,7 +325,9 @@ export function validateCompanyLineInput(body: Record<string, unknown>): Result<
   kind: "income" | "expense"; category: string; description: string; amount: number;
 }> {
   const kind = body.kind === "income" ? "income" : "expense";
-  const category = vText("Category", body.category, { required: true, max: 80 });
+  // The P&L form has ONE text field (sent as `description`); `category` is a
+  // parked column — both are optional here, charset/length-checked when present.
+  const category = vText("Category", body.category, { required: false, max: 80 });
   const description = vText("Description", body.description, { required: false, max: 300 });
   for (const r of [category, description]) if (r.error) return { error: r.error };
   const raw = body.amount;
