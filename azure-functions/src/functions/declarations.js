@@ -1,5 +1,7 @@
 const { app } = require("@azure/functions");
 const { sql, getPool } = require("../db");
+const { deleteBlob } = require("../blob");
+const { getAppConfig } = require("../config");
 
 // /api/declarations — a raultax user's tax declarations (one per tax year).
 // The year is the filing's primary attribute; every per-year table hangs off
@@ -11,11 +13,14 @@ const { sql, getPool } = require("../db");
 //           On a FRESH year, copy-forward: dependents, bank accounts, jobs,
 //           companies (P&L reset), spouse AND the per-year 1040 fields are
 //           cloned from the most recent other year.
+//   DELETE ?oid=&taxYear=         -> remove the year's declaration AND all its
+//           per-year data (rows + year-scoped documents' blobs). Refused when
+//           the year's return is FROZEN (preparer approved).
 const FIELD_COLS = `filing_status, marital_status, street_address, city,
                     state_province, postal_code`;
 
 app.http("declarations", {
-  methods: ["GET", "POST"],
+  methods: ["GET", "POST", "DELETE"],
   authLevel: "function",
   route: "declarations",
   handler: async (request, context) => {
@@ -176,6 +181,64 @@ app.http("declarations", {
         }
 
         return { status: 200, jsonBody: row };
+      }
+
+      if (request.method === "DELETE") {
+        const oid = request.query.get("oid");
+        const taxYear = Number(request.query.get("taxYear"));
+        if (!oid || !Number.isInteger(taxYear)) {
+          return { status: 400, jsonBody: { error: "oid and taxYear are required" } };
+        }
+
+        // An approved (frozen) return is the preparer's — refuse to delete.
+        const frozen = (await pool.request()
+          .input("oid", sql.NVarChar(64), oid)
+          .input("year", sql.Int, taxYear)
+          .query(`SELECT frozen FROM raul_tax_form_1040 WHERE owner_oid = @oid AND tax_year = @year;`))
+          .recordset[0];
+        if (frozen && frozen.frozen) {
+          return {
+            status: 409,
+            jsonBody: { error: "This declaration was approved by your tax preparer and can't be deleted. Contact them to reopen it." },
+          };
+        }
+
+        // Year-scoped documents (W-2/1099): blobs first, then rows+extractions.
+        const cfg = getAppConfig(request.headers.get("x-app-id") || "raultax");
+        const files = (await pool.request()
+          .input("oid", sql.NVarChar(64), oid)
+          .input("year", sql.Int, taxYear).query(`
+            SELECT id, blob_name FROM raul_tax_files
+            WHERE owner_oid = @oid AND tax_year = @year
+              AND doc_type IN ('w2', 'form_1099');`)).recordset;
+        for (const f of files) {
+          await deleteBlob(cfg.container, f.blob_name).catch(() => {});
+          await pool.request().input("id", sql.Int, f.id).query(`
+            DELETE FROM raul_tax_file_extractions WHERE file_id = @id;
+            DELETE FROM raul_tax_files WHERE id = @id;`);
+        }
+
+        // Cascade every per-year table, then the declaration itself.
+        await pool.request()
+          .input("oid", sql.NVarChar(64), oid)
+          .input("year", sql.Int, taxYear).query(`
+            DELETE FROM raul_tax_company_lines
+            WHERE owner_oid = @oid AND company_id IN
+              (SELECT id FROM raul_tax_companies WHERE owner_oid = @oid AND tax_year = @year);
+            DELETE FROM raul_tax_companies    WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_jobs         WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_dependents   WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_care_providers WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_bank_accounts WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_spouse       WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_form_2441    WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_schedule1    WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_schedule_se  WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_form_1040    WHERE owner_oid = @oid AND tax_year = @year;
+            DELETE FROM raul_tax_declarations WHERE owner_oid = @oid AND tax_year = @year;
+          `);
+
+        return { status: 200, jsonBody: { ok: true, deletedFiles: files.length } };
       }
 
       return { status: 405, jsonBody: { error: "Method not allowed" } };

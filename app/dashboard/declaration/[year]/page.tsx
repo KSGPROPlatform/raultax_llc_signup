@@ -24,12 +24,15 @@ import { DeclarationReview } from "@/components/dashboard/DeclarationReview";
 // Edit action unlocks the section editors).
 export default async function DeclarationReviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ year: string }>;
+  searchParams: Promise<{ edit?: string }>;
 }) {
   const user = await getSession();
   if (!user) redirect("/login");
 
+  const startEditing = (await searchParams).edit === "1";
   const raw = (await params).year;
   if (!isAllowedTaxYear(raw)) redirect("/dashboard/user");
   const year = Number(raw);
@@ -90,6 +93,7 @@ export default async function DeclarationReviewPage({
   return (
     <DeclarationReview
       year={year}
+      initialEditing={startEditing}
       status={decl.status}
       filingStatus={(decl.filing_status ?? "").trim()}
       profile={{

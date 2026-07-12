@@ -35,6 +35,7 @@ type Money = number | null;
 
 export type DeclarationReviewProps = {
   year: number;
+  initialEditing?: boolean;
   status: string;
   filingStatus: string;
   profile: {
@@ -62,7 +63,7 @@ export function DeclarationReview(props: DeclarationReviewProps) {
   const { year, status, filingStatus, profile, spouse, dependents, careProviders, banks, jobs, companies, documents, outcome } = props;
   const router = useRouter();
   const toast = useToast();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(Boolean(props.initialEditing));
   const [savingPersonal, setSavingPersonal] = useState(false);
 
   const showSpouse = filingStatus === "Married filing jointly" || filingStatus === "Married filing separately";

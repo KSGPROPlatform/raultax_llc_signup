@@ -288,6 +288,27 @@ export const createDeclaration = (
   fields?: DeclarationInput,
 ) => saveRow<Declaration>("declarations", oid, { taxYear, ...(fields ?? {}) });
 
+// Delete a whole declaration year (rows + year-scoped documents). The
+// function refuses (409) when the return is frozen (preparer approved).
+export async function deleteDeclaration(
+  oid: string,
+  taxYear: number,
+): Promise<{ ok: boolean; error?: string }> {
+  if (!base) return { ok: false, error: "Not configured." };
+  try {
+    const res = await fetch(fnUrl("declarations", { oid, taxYear }), {
+      method: "DELETE",
+      headers: APP_HEADERS,
+      signal: AbortSignal.timeout(30000),
+    });
+    if (res.ok) return { ok: true };
+    const d = (await res.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: d.error ?? "Delete failed." };
+  } catch {
+    return { ok: false, error: "Network error." };
+  }
+}
+
 // Post-submit modifications REOPEN the year: any data change (info edited,
 // rows added/removed, documents uploaded/deleted) flips a "submitted"
 // declaration back to draft, so the Submit button reappears and re-submitting

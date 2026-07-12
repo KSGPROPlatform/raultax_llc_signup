@@ -5,10 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Building2,
   FileText,
-  Users,
-  Settings,
   Menu,
   X,
   type LucideIcon,
@@ -37,16 +34,10 @@ export function DashboardShell({
   const home = role === "admin" ? "/dashboard/admin" : "/dashboard/user";
   const nav: NavItem[] =
     role === "admin"
-      ? [
-          { label: "Overview", href: "/dashboard/admin", icon: LayoutDashboard },
-          { label: "Users", href: "/dashboard/admin#users", icon: Users },
-          { label: "Settings", href: "#", icon: Settings },
-        ]
+      ? [{ label: "Overview", href: "/dashboard/admin", icon: LayoutDashboard }]
       : [
-          { label: "Overview", href: "/dashboard/user", icon: LayoutDashboard },
-          { label: "Companies", href: "/dashboard/user#companies", icon: Building2 },
-          { label: "Documents", href: "/dashboard/user#documents", icon: FileText },
-          { label: "Settings", href: "#", icon: Settings },
+          { label: "Dashboard", href: "/dashboard/user", icon: LayoutDashboard },
+          { label: "My Form 1040", href: "/dashboard/return", icon: FileText },
         ];
 
   const initial = (name || email || "?").charAt(0).toUpperCase();
@@ -62,10 +53,17 @@ export function DashboardShell({
         </span>
       </Link>
 
-      <nav className="flex-1 space-y-1 px-3" aria-label="Dashboard">
+      <nav className="flex-1 px-3" aria-label="Dashboard">
+        <p className="px-3 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+          Menu
+        </p>
+        <div className="space-y-1">
         {nav.map((item) => {
           const base = item.href.split("#")[0];
-          const active = item.href.startsWith("/dashboard") && pathname === base;
+          const active =
+            item.href.startsWith("/dashboard") &&
+            (pathname === base || pathname.startsWith(base + "/") ||
+             (base === "/dashboard/user" && pathname.startsWith("/dashboard/declaration")));
           return (
             <Link
               key={item.label}
@@ -83,6 +81,7 @@ export function DashboardShell({
             </Link>
           );
         })}
+        </div>
       </nav>
 
       <div className="border-t border-zinc-200 p-4 dark:border-zinc-800">

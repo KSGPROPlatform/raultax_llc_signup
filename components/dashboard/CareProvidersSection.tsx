@@ -172,8 +172,9 @@ export function CareProvidersSection() {
           Childcare providers
         </h3>
         <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-          Who you paid for childcare. Required by the IRS (Form 2441) when you
-          claim childcare expenses or your W-2 shows dependent-care benefits.
+          The daycare, babysitter or organization <span className="font-medium">you paid</span> to
+          look after your dependents — not you. The IRS requires their name and
+          tax ID (Form 2441) before it grants the childcare credit.
         </p>
       </div>
 
