@@ -376,16 +376,14 @@ export function DeclarationReview(props: DeclarationReviewProps) {
         {editing ? (
           <div className="space-y-3">
             <DocUpload docType="ssn_copy" label="SSN document" />
-            {spouseMode === "full" && (
+            {spouseMode === "full" && showSpouse && (
               <DocUpload docType="spouse_ssn_copy" label="Spouse SSN document" />
             )}
-            <DocUpload docType="id_front" label="Photo ID — front" />
-            <DocUpload docType="id_back" label="Photo ID — back" />
           </div>
         ) : (
           (() => {
             const idDocs = documents.filter((d) =>
-              ["ssn_copy", "spouse_ssn_copy", "id_front", "id_back"].includes(d.docType ?? ""),
+              ["ssn_copy", "spouse_ssn_copy"].includes(d.docType ?? ""),
             );
             return idDocs.length ? (
               <ItemList
@@ -405,8 +403,6 @@ function docLabel(t: string | null): string {
   switch (t) {
     case "ssn_copy": return "SSN document";
     case "spouse_ssn_copy": return "Spouse SSN document";
-    case "id_front": return "Photo ID — front";
-    case "id_back": return "Photo ID — back";
     default: return "Document";
   }
 }
