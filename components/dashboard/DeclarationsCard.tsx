@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, ArrowRight, CheckCircle2, Loader2, Send, Eye } from "lucide-react";
+import { FileText, Plus, ArrowRight, CheckCircle2, Loader2, Send, Eye, ChevronRight } from "lucide-react";
 import type { Declaration } from "@/lib/profileData";
 import { allowedTaxYears } from "@/lib/taxYear";
+import { useToast } from "@/components/ui/Toast";
 
 // The dashboard's tax-declaration hub (replaces the year dropdown + profile
 // checklist):
@@ -18,6 +19,7 @@ import { allowedTaxYears } from "@/lib/taxYear";
 //     every available year is started.
 export function DeclarationsCard() {
   const router = useRouter();
+  const toast = useToast();
   const [decls, setDecls] = useState<Declaration[] | null>(null);
   const [activeYear, setActiveYear] = useState<number | null>(null);
   const [busyYear, setBusyYear] = useState<number | null>(null);
@@ -84,9 +86,14 @@ export function DeclarationsCard() {
   const started = new Set(decls.map((r) => r.tax_year));
   const remaining = allowedTaxYears().filter((y) => !started.has(y));
 
+  // Open the full read-only review for a year.
+  function openReview(year: number) {
+    router.push(`/dashboard/declaration/${year}`);
+  }
+
   // Mark a finished year's declaration as submitted.
   async function submitYear(year: number) {
-    if (!confirm(`Submit your ${year} tax declaration? You can still view it afterwards.`)) return;
+    if (!confirm(`Submit your ${year} tax declaration? You can still review it afterwards.`)) return;
     setBusyYear(year);
     setError(null);
     try {
@@ -98,13 +105,16 @@ export function DeclarationsCard() {
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setError(d.error || "Could not submit the declaration.");
+        toast.error(d.error || `Could not submit your ${year} declaration.`);
         return;
       }
       setDecls((prev) =>
         (prev ?? []).map((r) => (r.tax_year === year ? { ...r, status: "submitted" } : r)),
       );
+      toast.success(`Your ${year} declaration was submitted for review.`);
     } catch {
       setError("Network error. Please try again.");
+      toast.error("Network error — please try again.");
     } finally {
       setBusyYear(null);
     }
@@ -186,6 +196,10 @@ export function DeclarationsCard() {
         )}
       </div>
 
+      <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+        Select a year to review everything you entered — then edit if you need to.
+      </p>
+
       {error && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <ul className="mt-4 space-y-2">
@@ -197,7 +211,16 @@ export function DeclarationsCard() {
           return (
             <li
               key={r.id}
-              className={`flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-4 py-3 ${
+              role="button"
+              tabIndex={0}
+              onClick={() => openReview(r.tax_year)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openReview(r.tax_year);
+                }
+              }}
+              className={`group flex cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border px-4 py-3 transition-colors hover:border-amber-300 hover:bg-amber-50/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:hover:border-amber-500/40 dark:hover:bg-amber-500/5 ${
                 isActive
                   ? "border-amber-300 bg-amber-50/60 dark:border-amber-500/30 dark:bg-amber-500/5"
                   : "border-zinc-200 dark:border-zinc-800"
@@ -214,6 +237,9 @@ export function DeclarationsCard() {
                       Active
                     </span>
                   )}
+                  <span className="ml-auto hidden items-center gap-0.5 text-[11px] font-medium text-amber-600 opacity-0 transition-opacity group-hover:opacity-100 sm:inline-flex dark:text-amber-400">
+                    Open review <ChevronRight className="h-3.5 w-3.5" />
+                  </span>
                 </div>
                 <div className="mt-1.5 flex items-center gap-2">
                   <div className="h-1.5 w-full max-w-48 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
@@ -233,9 +259,10 @@ export function DeclarationsCard() {
                     </span>
                     <Link
                       href={`/dashboard/return?year=${r.tax_year}`}
+                      onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
                     >
-                      <Eye className="h-4 w-4" /> View return
+                      <Eye className="h-4 w-4" /> View 1040
                     </Link>
                   </span>
                   {results[r.tax_year]?.status === "approved" ? (
@@ -255,7 +282,10 @@ export function DeclarationsCard() {
                   <button
                     type="button"
                     disabled={busyYear !== null}
-                    onClick={() => go(r.tax_year)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      go(r.tax_year);
+                    }}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3.5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
                   >
                     {busyYear === r.tax_year ? (
@@ -270,7 +300,10 @@ export function DeclarationsCard() {
                     <button
                       type="button"
                       disabled={busyYear !== null}
-                      onClick={() => submitYear(r.tax_year)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        submitYear(r.tax_year);
+                      }}
                       className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400 disabled:opacity-50"
                     >
                       <Send className="h-4 w-4" /> Submit

@@ -16,6 +16,7 @@ import {
 import type { Role } from "@/lib/session";
 import { RoleBadge } from "./RoleBadge";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { ToastProvider } from "@/components/ui/Toast";
 
 type NavItem = { label: string; href: string; icon: LucideIcon };
 
@@ -107,6 +108,7 @@ export function DashboardShell({
   );
 
   return (
+    <ToastProvider>
     <div className="flex min-h-dvh bg-zinc-50 dark:bg-black">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 border-r border-zinc-200 bg-white md:block dark:border-zinc-800 dark:bg-zinc-950">
@@ -159,5 +161,6 @@ export function DashboardShell({
         </main>
       </div>
     </div>
+    </ToastProvider>
   );
 }
