@@ -74,31 +74,57 @@ export default async function ReturnPage({
   const owed = eff("line_37") ?? 0;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between print:hidden">
+    <div className="space-y-6">
+      {/* Same page frame as the dashboard/declaration pages: back link, then
+          the standard header card with title, status chip and actions. */}
+      <div className="flex flex-col gap-4 print:hidden">
         <Link
           href="/dashboard/user"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 hover:underline dark:text-zinc-400"
+          className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
         >
           <ArrowLeft className="h-4 w-4" /> Back to dashboard
         </Link>
-        {row && (
-          <div className="flex items-center gap-2">
-            {hasF1040Template(year) && (
-              <a
-                href={`/api/tax-return/pdf?year=${year}`}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400"
-              >
-                <FileDown className="h-4 w-4" /> Download IRS Form 1040
-              </a>
+
+        <div className="flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              My Form 1040
+            </p>
+            <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+              Tax year {year}
+            </h1>
+            {row && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {frozen ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Approved
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                    <Clock className="h-3.5 w-3.5" /> Pending preparer review
+                  </span>
+                )}
+              </div>
             )}
-            <PrintButton />
           </div>
-        )}
+          {row && (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <PrintButton />
+              {hasF1040Template(year) && (
+                <a
+                  href={`/api/tax-return/pdf?year=${year}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-3.5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400"
+                >
+                  <FileDown className="h-4 w-4" /> Download IRS Form 1040
+                </a>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {!row ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-950">
+        <section className="rounded-2xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-950">
           <h1 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
             No return yet for {year}
           </h1>
@@ -107,7 +133,7 @@ export default async function ReturnPage({
           </p>
         </section>
       ) : (
-        <section className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <section className="mx-auto w-full max-w-3xl rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
           {/* Status banner */}
           {frozen ? (
             <div className="flex items-center gap-2 rounded-t-xl bg-emerald-50 px-6 py-3 text-sm font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">
