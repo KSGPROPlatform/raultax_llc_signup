@@ -20,6 +20,7 @@ import {
   Loader2,
   FileDown,
   Eye,
+  Send,
 } from "lucide-react";
 import { maskTail } from "@/components/profile/mask";
 import { useToast } from "@/components/ui/Toast";
@@ -64,6 +65,7 @@ export function DeclarationReview(props: DeclarationReviewProps) {
   const toast = useToast();
   const [editing, setEditing] = useState(Boolean(props.initialEditing));
   const [savingPersonal, setSavingPersonal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const showSpouse = filingStatus === "Married filing jointly" || filingStatus === "Married filing separately";
   const spouseMode: "full" | "ssn" = filingStatus === "Married filing jointly" ? "full" : "ssn";
@@ -96,7 +98,11 @@ export function DeclarationReview(props: DeclarationReviewProps) {
       setEditing(false);
       // Pull fresh server data back into the read-only view.
       router.refresh();
-      toast.info("Review updated with your latest changes.");
+      toast.info(
+        submitted
+          ? "Review updated with your latest changes."
+          : "Changes saved — submit for review when you're ready.",
+      );
       return;
     }
     const ok = await activateYear();
@@ -105,6 +111,30 @@ export function DeclarationReview(props: DeclarationReviewProps) {
       return;
     }
     setEditing(true);
+  }
+
+  async function submitDeclaration() {
+    if (!confirm(`Submit your ${year} tax declaration for review? Your tax preparer will check it and compute your return.`)) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/declarations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taxYear: year, status: "submitted" }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // The server names exactly what's missing (filing status, bank, …).
+        toast.error(d.error || `Could not submit your ${year} declaration.`);
+        return;
+      }
+      toast.success(`Your ${year} declaration was submitted — your preparer will review it.`);
+      router.refresh();
+    } catch {
+      toast.error("Network error — the declaration wasn't submitted.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   async function savePersonal(values: PersonalInfoValues) {
@@ -158,7 +188,7 @@ export function DeclarationReview(props: DeclarationReviewProps) {
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {approved && (
+            {approved && !editing && (
               <a
                 href={`/api/tax-return/pdf?year=${year}`}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-300 px-3.5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
@@ -172,12 +202,28 @@ export function DeclarationReview(props: DeclarationReviewProps) {
               className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                 editing
                   ? "bg-emerald-600 text-white hover:bg-emerald-500"
-                  : "bg-amber-500 text-zinc-950 hover:bg-amber-400"
+                  : submitted
+                    ? "bg-amber-500 text-zinc-950 hover:bg-amber-400"
+                    : "border border-zinc-300 text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
               }`}
             >
               {editing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
               {editing ? "Done editing" : "Edit"}
             </button>
+            {/* Submit lives HERE so "Done editing" flows straight into it —
+                no trip back to the dashboard. Hidden while editing and once
+                the year is submitted. */}
+            {!editing && !submitted && (
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={submitDeclaration}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400 disabled:opacity-50"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {submitting ? "Submitting…" : "Submit declaration"}
+              </button>
+            )}
           </div>
         </div>
       </div>
