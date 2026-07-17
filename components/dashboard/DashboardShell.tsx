@@ -30,7 +30,8 @@ function pageTitle(pathname: string, role: Role): string {
   if (pathname.startsWith("/dashboard/declaration")) return "Tax declaration";
   if (pathname.startsWith("/dashboard/return")) return "My Form 1040";
   if (pathname.startsWith("/dashboard/admin")) return "Overview";
-  return role === "admin" ? "Overview" : "Dashboard";
+  if (pathname.startsWith("/dashboard/review")) return "Review queue";
+  return role === "admin" ? "Overview" : role === "reviewer" ? "Review queue" : "Dashboard";
 }
 
 export function DashboardShell({
@@ -47,14 +48,17 @@ export function DashboardShell({
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  const home = role === "admin" ? "/dashboard/admin" : "/dashboard/user";
+  const home =
+    role === "admin" ? "/dashboard/admin" : role === "reviewer" ? "/dashboard/review" : "/dashboard/user";
   const nav: NavItem[] =
     role === "admin"
       ? [{ label: "Overview", href: "/dashboard/admin", icon: LayoutDashboard }]
-      : [
-          { label: "Dashboard", href: "/dashboard/user", icon: LayoutDashboard },
-          { label: "My Form 1040", href: "/dashboard/return", icon: FileText },
-        ];
+      : role === "reviewer"
+        ? [{ label: "Review queue", href: "/dashboard/review", icon: LayoutDashboard }]
+        : [
+            { label: "Dashboard", href: "/dashboard/user", icon: LayoutDashboard },
+            { label: "My Form 1040", href: "/dashboard/return", icon: FileText },
+          ];
 
   const initials = initialsOf(name, email);
   const displayName = name || email || "Account";
@@ -123,6 +127,11 @@ export function DashboardShell({
               {role === "admin" && (
                 <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
                   <ShieldCheck className="h-3 w-3" /> Admin
+                </span>
+              )}
+              {role === "reviewer" && (
+                <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 dark:text-sky-400">
+                  <ShieldCheck className="h-3 w-3" /> Reviewer
                 </span>
               )}
             </span>

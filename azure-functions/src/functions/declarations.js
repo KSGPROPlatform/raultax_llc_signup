@@ -20,7 +20,7 @@ const FIELD_COLS = `filing_status, marital_status, street_address, city,
                     state_province, postal_code`;
 
 app.http("declarations", {
-  methods: ["GET", "POST", "DELETE"],
+  methods: ["GET", "POST", "PATCH", "DELETE"],
   authLevel: "function",
   route: "declarations",
   handler: async (request, context) => {
@@ -28,6 +28,37 @@ app.http("declarations", {
       const pool = await getPool();
 
       if (request.method === "GET") {
+        // Admin queue: every declaration with its owner and assigned reviewer.
+        if (request.query.get("queue")) {
+          const rows = await pool.request().query(`
+            SELECT d.owner_oid, d.tax_year, d.status, d.filing_status, d.updated_at,
+                   d.assigned_reviewer_oid,
+                   u.name AS user_name, u.email AS user_email,
+                   rv.name AS reviewer_name,
+                   f.frozen
+            FROM raul_tax_declarations d
+            JOIN raul_tax_users u ON u.entra_object_id = d.owner_oid
+            LEFT JOIN raul_tax_users rv ON rv.entra_object_id = d.assigned_reviewer_oid
+            LEFT JOIN raul_tax_form_1040 f
+              ON f.owner_oid = d.owner_oid AND f.tax_year = d.tax_year
+            ORDER BY CASE d.status WHEN 'submitted' THEN 0 ELSE 1 END, d.updated_at DESC;`);
+          return { status: 200, jsonBody: rows.recordset };
+        }
+        // Reviewer queue: declarations assigned to this reviewer.
+        const reviewerOid = request.query.get("reviewerOid");
+        if (reviewerOid) {
+          const rows = await pool.request()
+            .input("rid", sql.NVarChar(64), reviewerOid).query(`
+              SELECT d.owner_oid, d.tax_year, d.status, d.filing_status, d.updated_at,
+                     u.name AS user_name, u.email AS user_email, f.frozen
+              FROM raul_tax_declarations d
+              JOIN raul_tax_users u ON u.entra_object_id = d.owner_oid
+              LEFT JOIN raul_tax_form_1040 f
+                ON f.owner_oid = d.owner_oid AND f.tax_year = d.tax_year
+              WHERE d.assigned_reviewer_oid = @rid
+              ORDER BY CASE d.status WHEN 'submitted' THEN 0 ELSE 1 END, d.updated_at DESC;`);
+          return { status: 200, jsonBody: rows.recordset };
+        }
         const oid = request.query.get("oid");
         if (!oid) return { status: 400, jsonBody: { error: "oid is required" } };
         const result = await pool
@@ -181,6 +212,35 @@ app.http("declarations", {
         }
 
         return { status: 200, jsonBody: row };
+      }
+
+      // PATCH { oid, taxYear, assignedReviewerOid|null } — hand a declaration
+      // to a reviewer (or unassign with null). Admin-gated in the app route.
+      if (request.method === "PATCH") {
+        const b = (await request.json().catch(() => ({}))) || {};
+        const taxYear = Number(b.taxYear);
+        if (!b.oid || !Number.isInteger(taxYear)) {
+          return { status: 400, jsonBody: { error: "oid and taxYear are required" } };
+        }
+        const rid = b.assignedReviewerOid ?? null;
+        if (rid !== null) {
+          const rv = (await pool.request().input("rid", sql.NVarChar(64), rid)
+            .query(`SELECT role FROM raul_tax_users WHERE entra_object_id = @rid;`))
+            .recordset[0];
+          if (!rv || !["reviewer", "admin"].includes(rv.role)) {
+            return { status: 400, jsonBody: { error: "That account isn't a reviewer." } };
+          }
+        }
+        const r = await pool.request()
+          .input("oid", sql.NVarChar(64), b.oid)
+          .input("year", sql.Int, taxYear)
+          .input("rid", sql.NVarChar(64), rid).query(`
+            UPDATE raul_tax_declarations
+            SET assigned_reviewer_oid = @rid, updated_at = SYSUTCDATETIME()
+            WHERE owner_oid = @oid AND tax_year = @year;
+            SELECT @@ROWCOUNT AS n;`);
+        if (!r.recordset[0].n) return { status: 404, jsonBody: { error: "Declaration not found" } };
+        return { status: 200, jsonBody: { ok: true } };
       }
 
       if (request.method === "DELETE") {

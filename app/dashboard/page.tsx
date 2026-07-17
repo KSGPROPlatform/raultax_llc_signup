@@ -6,5 +6,11 @@ import { getSession } from "@/lib/auth";
 export default async function DashboardIndex() {
   const user = await getSession();
   if (!user) redirect("/login");
-  redirect(user.role === "admin" ? "/dashboard/admin" : "/dashboard/user");
+  redirect(
+    user.role === "admin"
+      ? "/dashboard/admin"
+      : user.role === "reviewer"
+        ? "/dashboard/review"
+        : "/dashboard/user",
+  );
 }

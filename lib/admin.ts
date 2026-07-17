@@ -101,3 +101,65 @@ export async function getAdminUserDetail(oid: string): Promise<AdminUserDetail |
     return null;
   }
 }
+
+// ---- Reviewer team & declaration queue (admin workflows) ----
+
+export type QueueRow = {
+  owner_oid: string;
+  tax_year: number;
+  status: string;
+  filing_status: string | null;
+  updated_at: string;
+  assigned_reviewer_oid: string | null;
+  user_name: string | null;
+  user_email: string | null;
+  reviewer_name: string | null;
+  frozen: boolean | null;
+};
+
+async function fnJson<T>(url: string, init?: RequestInit): Promise<T | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { ...APP_HEADERS, ...(init?.body ? { "Content-Type": "application/json" } : {}) },
+      cache: "no-store",
+      signal: AbortSignal.timeout(20000),
+      ...init,
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+export const getQueue = () =>
+  fnJson<QueueRow[]>(fnUrl("declarations", { queue: "1" })).then((r) => r ?? []);
+
+export const getReviewerQueue = (reviewerOid: string) =>
+  fnJson<QueueRow[]>(fnUrl("declarations", { reviewerOid })).then((r) => r ?? []);
+
+export const assignReviewer = (oid: string, taxYear: number, reviewerOid: string | null) =>
+  fnJson<{ ok: boolean; error?: string }>(fnUrl("declarations"), {
+    method: "PATCH",
+    body: JSON.stringify({ oid, taxYear, assignedReviewerOid: reviewerOid }),
+  });
+
+export const setUserRole = (oid: string, role: "user" | "reviewer") =>
+  fnJson<{ ok: boolean }>(fnUrl("manageUsers"), {
+    method: "PATCH",
+    body: JSON.stringify({ oid, role }),
+  });
+
+export const inviteReviewer = (email: string, invitedBy: string) =>
+  fnJson<{ ok: boolean; promoted?: boolean; invited?: boolean }>(fnUrl("manageUsers"), {
+    method: "POST",
+    body: JSON.stringify({ email, invitedBy }),
+  });
+
+export type ReviewerInvite = { email: string; invited_by: string | null; created_at: string };
+
+export const listReviewerInvites = () =>
+  fnJson<ReviewerInvite[]>(fnUrl("manageUsers", { invites: "1" })).then((r) => r ?? []);
+
+export const withdrawInvite = (email: string) =>
+  fnJson<{ ok: boolean }>(fnUrl("manageUsers", { email }), { method: "DELETE" });

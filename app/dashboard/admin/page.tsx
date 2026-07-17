@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { AdminOverview } from "@/components/dashboard/AdminOverview";
+import { AdminDashboardPanels } from "@/components/dashboard/AdminDashboardPanels";
 
 export default async function AdminDashboardPage() {
   const user = await getSession();
@@ -15,9 +16,12 @@ export default async function AdminDashboardPage() {
           Admin dashboard
         </h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Everyone who has signed up, their tax profile, and their documents.
+          Assign submitted declarations to your review team, manage the team,
+          and see every client at a glance.
         </p>
       </header>
+
+      <AdminDashboardPanels />
 
       <AdminOverview />
     </div>

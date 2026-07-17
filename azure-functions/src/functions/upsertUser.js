@@ -70,7 +70,10 @@ app.http("upsertUser", {
                     street_address, city, state_province, postal_code,
                     owns_establishment, onboarding_completed,
                     created_at, updated_at)
-            VALUES (@oid, @email, @name, 'user',
+            VALUES (@oid, @email, @name,
+                    CASE WHEN EXISTS (SELECT 1 FROM raul_tax_reviewer_invites i
+                                      WHERE LOWER(i.email) = LOWER(@email))
+                         THEN 'reviewer' ELSE 'user' END,
                     ISNULL(@first_name, ''), ISNULL(@last_name, ''), ISNULL(@middle_name, ''),
                     ISNULL(@date_of_birth, ''), ISNULL(@filing_status, ''),
                     ISNULL(@marital_status, ''),

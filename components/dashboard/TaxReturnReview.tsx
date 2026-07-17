@@ -23,7 +23,13 @@ const money = (v: unknown) =>
     ? Number(v).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 })
     : "—";
 
-export function TaxReturnReview({ oid }: { oid: string }) {
+export function TaxReturnReview({
+  oid,
+  apiBase = "/api/admin",
+}: {
+  oid: string;
+  apiBase?: string;
+}) {
   const [decls, setDecls] = useState<Declaration[]>([]);
   const [year, setYear] = useState<number | null>(null);
   const [row, setRow] = useState<ReturnRow | null>(null);
@@ -37,7 +43,7 @@ export function TaxReturnReview({ oid }: { oid: string }) {
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/admin/declarations?oid=${encodeURIComponent(oid)}`);
+        const res = await fetch(`${apiBase}/declarations?oid=${encodeURIComponent(oid)}`);
         const d = res.ok ? await res.json() : {};
         if (!active) return;
         const rows = (d.rows ?? []) as Declaration[];
@@ -51,13 +57,13 @@ export function TaxReturnReview({ oid }: { oid: string }) {
     return () => {
       active = false;
     };
-  }, [oid]);
+  }, [oid, apiBase]);
 
   const load = useCallback(async (y: number) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/admin/tax-return?oid=${encodeURIComponent(oid)}&year=${y}`);
+      const res = await fetch(`${apiBase}/tax-return?oid=${encodeURIComponent(oid)}&year=${y}`);
       const d = res.ok ? await res.json() : {};
       setRow((d.return ?? null) as ReturnRow | null);
     } catch {
@@ -65,7 +71,7 @@ export function TaxReturnReview({ oid }: { oid: string }) {
     } finally {
       setLoading(false);
     }
-  }, [oid]);
+  }, [oid, apiBase]);
 
   useEffect(() => {
     if (year !== null) load(year);
@@ -76,7 +82,7 @@ export function TaxReturnReview({ oid }: { oid: string }) {
     setBusy("compute");
     setError(null);
     try {
-      const res = await fetch(`/api/admin/tax-return?oid=${encodeURIComponent(oid)}&year=${year}`, { method: "POST" });
+      const res = await fetch(`${apiBase}/tax-return?oid=${encodeURIComponent(oid)}&year=${year}`, { method: "POST" });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) setError(d.error || "Computation failed.");
       else if (d.frozen) setError("This return is frozen — unfreeze to recompute.");
@@ -91,7 +97,7 @@ export function TaxReturnReview({ oid }: { oid: string }) {
     setBusy("patch");
     setError(null);
     try {
-      const res = await fetch(`/api/admin/tax-return?oid=${encodeURIComponent(oid)}&year=${year}`, {
+      const res = await fetch(`${apiBase}/tax-return?oid=${encodeURIComponent(oid)}&year=${year}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

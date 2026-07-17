@@ -88,7 +88,7 @@ export async function upsertUser(
       owns_establishment?: boolean | number;
     } | null;
     return {
-      role: data?.role === "admin" ? "admin" : "user",
+      role: data?.role === "admin" ? "admin" : data?.role === "reviewer" ? "reviewer" : "user",
       onboardingComplete: Boolean(data?.onboarding_completed),
       ownsEstablishment: Boolean(data?.owns_establishment),
     };

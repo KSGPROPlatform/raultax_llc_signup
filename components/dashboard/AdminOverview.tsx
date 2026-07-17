@@ -232,7 +232,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-function UserDetailModal({ oid, onClose }: { oid: string; onClose: () => void }) {
+export function UserDetailModal({ oid, onClose }: { oid: string; onClose: () => void }) {
   const [data, setData] = useState<AdminUserDetail | null>(null);
   const [loading, setLoading] = useState(true);
 

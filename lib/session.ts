@@ -14,7 +14,7 @@ export type AuthClaims = {
   name: string | null;
 };
 
-export type Role = "admin" | "user";
+export type Role = "admin" | "reviewer" | "user";
 
 // What we keep in the session cookie: the claims plus our app-managed state
 // (resolved from Azure SQL via the upsertUser function on sign-in/sign-up).

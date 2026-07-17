@@ -12,13 +12,76 @@ const { sql, getPool } = require("../db");
 // raultax-specific. Called server-to-server by the admin-only app route, which
 // enforces the admin role; this function is only the data source.
 app.http("manageUsers", {
-  methods: ["GET"],
+  methods: ["GET", "PATCH", "POST", "DELETE"],
   authLevel: "function",
   route: "manageUsers",
   handler: async (request, context) => {
     try {
       const pool = await getPool();
+
+      // PATCH { oid, role } — flip an account between user and reviewer.
+      // 'admin' is deliberately NOT settable here (SQL-only, defense in depth).
+      if (request.method === "PATCH") {
+        const b = (await request.json().catch(() => ({}))) || {};
+        if (!b.oid || !["user", "reviewer"].includes(b.role)) {
+          return { status: 400, jsonBody: { error: "oid and role (user|reviewer) are required" } };
+        }
+        const r = await pool.request()
+          .input("oid", sql.NVarChar(64), b.oid)
+          .input("role", sql.NVarChar(20), b.role).query(`
+            UPDATE raul_tax_users SET role = @role, updated_at = SYSUTCDATETIME()
+            WHERE entra_object_id = @oid AND role <> 'admin';
+            SELECT @@ROWCOUNT AS n;`);
+        if (!r.recordset[0].n) return { status: 404, jsonBody: { error: "Not found (or admin)" } };
+        return { status: 200, jsonBody: { ok: true } };
+      }
+
+      // POST { email, invitedBy } — invite a reviewer by email. If the account
+      // already exists it's promoted immediately; otherwise the invite makes
+      // the account a reviewer the moment that email signs up.
+      if (request.method === "POST") {
+        const b = (await request.json().catch(() => ({}))) || {};
+        const email = String(b.email || "").trim().toLowerCase();
+        if (!email) return { status: 400, jsonBody: { error: "email is required" } };
+        const existing = (await pool.request()
+          .input("email", sql.NVarChar(256), email)
+          .query(`SELECT entra_object_id, role FROM raul_tax_users WHERE LOWER(email) = @email;`))
+          .recordset[0];
+        if (existing && existing.role === "admin") {
+          return { status: 400, jsonBody: { error: "That account is an admin." } };
+        }
+        if (existing) {
+          await pool.request().input("oid", sql.NVarChar(64), existing.entra_object_id).query(`
+            UPDATE raul_tax_users SET role = 'reviewer', updated_at = SYSUTCDATETIME()
+            WHERE entra_object_id = @oid;`);
+          return { status: 200, jsonBody: { ok: true, promoted: true } };
+        }
+        await pool.request()
+          .input("email", sql.NVarChar(256), email)
+          .input("by", sql.NVarChar(64), b.invitedBy ?? null).query(`
+            MERGE raul_tax_reviewer_invites AS t
+            USING (SELECT @email AS email) AS s ON t.email = s.email
+            WHEN NOT MATCHED THEN INSERT (email, invited_by) VALUES (@email, @by);`);
+        return { status: 201, jsonBody: { ok: true, invited: true } };
+      }
+
+      // DELETE ?email= — withdraw a pending invite.
+      if (request.method === "DELETE") {
+        const email = String(request.query.get("email") || "").trim().toLowerCase();
+        if (!email) return { status: 400, jsonBody: { error: "email is required" } };
+        await pool.request().input("email", sql.NVarChar(256), email)
+          .query(`DELETE FROM raul_tax_reviewer_invites WHERE LOWER(email) = @email;`);
+        return { status: 200, jsonBody: { ok: true } };
+      }
+
       const oid = request.query.get("oid");
+
+      // GET ?invites=1 — pending reviewer invites (for the Team panel).
+      if (request.query.get("invites")) {
+        const inv = await pool.request().query(`
+          SELECT email, invited_by, created_at FROM raul_tax_reviewer_invites ORDER BY created_at DESC;`);
+        return { status: 200, jsonBody: inv.recordset };
+      }
 
       if (oid) {
         const userRes = await pool
