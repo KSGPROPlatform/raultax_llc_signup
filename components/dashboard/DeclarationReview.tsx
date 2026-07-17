@@ -28,6 +28,7 @@ import { PersonalInfoForm, type PersonalInfoValues } from "@/components/profile/
 import { SpouseSection } from "@/components/dashboard/SpouseSection";
 import { DependentsSection } from "@/components/dashboard/DependentsSection";
 import { BankSection } from "@/components/dashboard/BankSection";
+import { FirmBankCard } from "@/components/dashboard/FirmBankCard";
 import { JobsSection } from "@/components/dashboard/JobsSection";
 import { CompaniesSection } from "@/components/dashboard/CompaniesSection";
 import { DocUpload } from "@/components/documents/DocUpload";
@@ -329,16 +330,24 @@ export function DeclarationReview(props: DeclarationReviewProps) {
       <SectionCard icon={Landmark} title="Bank accounts">
         {editing ? (
           <BankSection />
-        ) : banks.length ? (
-          <ItemList
-            items={banks.map((b) => ({
-              id: b.id,
-              title: b.bankName || "—",
-              sub: `Account ${maskTail(b.accountNumber)} · Routing ${maskTail(b.routingNumber)}`,
-            }))}
-          />
         ) : (
-          <EmptyNote>No bank account added — this is where a refund would be deposited.</EmptyNote>
+          <div className="space-y-4">
+            <FirmBankCard />
+            <div>
+              <SubHeading>Your bank account (for your refund)</SubHeading>
+              {banks.length ? (
+                <ItemList
+                  items={banks.map((b) => ({
+                    id: b.id,
+                    title: b.bankName || "—",
+                    sub: `Account ${maskTail(b.accountNumber)} · Routing ${maskTail(b.routingNumber)}`,
+                  }))}
+                />
+              ) : (
+                <EmptyNote>No bank account added — this is where a refund would be deposited.</EmptyNote>
+              )}
+            </div>
+          </div>
         )}
       </SectionCard>
 

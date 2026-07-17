@@ -6,6 +6,7 @@ import type { BankAccount } from "@/lib/profileData";
 import { BankForm, type BankValues } from "@/components/profile/BankForm";
 import { maskTail } from "@/components/profile/mask";
 import { Modal } from "@/components/dashboard/Modal";
+import { FirmBankCard } from "@/components/dashboard/FirmBankCard";
 import {
   AddButton,
   ListContainer,
@@ -87,6 +88,12 @@ export function BankSection({
 
   return (
     <div className="space-y-4">
+      <FirmBankCard />
+
+      <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        Your bank account (for your refund)
+      </p>
+
       {error && <SectionError message={error} />}
 
       {loading ? (

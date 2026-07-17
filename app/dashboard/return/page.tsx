@@ -13,6 +13,7 @@ import {
 } from "@/lib/profileData";
 import { maskTail } from "@/components/profile/mask";
 import { FORM_1040_SECTIONS, FORM_1040_STRONG } from "@/lib/form1040Lines";
+import { FEE_LABEL, netRefundAfterFee } from "@/lib/firm";
 import { PrintButton } from "@/components/dashboard/PrintButton";
 import { hasF1040Template } from "@/lib/pdf/fill1040";
 
@@ -251,6 +252,26 @@ export default async function ReturnPage({
               >
                 {money(refund > 0 ? refund : owed > 0 ? owed : 0)}
               </p>
+              {/* The Form 1040 number above stays OFFICIAL; the preparation fee
+                  is our service charge, spelled out so nothing surprises. */}
+              {refund > 0 &&
+                (netRefundAfterFee(refund) !== null ? (
+                  <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                    Preparation fee −{FEE_LABEL} · you&apos;ll receive{" "}
+                    <span className="font-semibold text-zinc-900 dark:text-zinc-50">
+                      {money(netRefundAfterFee(refund))}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                    Our {FEE_LABEL} preparation fee applies — see our bank details in your declaration.
+                  </p>
+                ))}
+              {owed > 0 && (
+                <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+                  Plus our {FEE_LABEL} preparation fee (see our bank details in your declaration).
+                </p>
+              )}
               {!frozen && (
                 <p className="mt-1 text-xs text-zinc-400">
                   Estimate — awaiting your preparer&apos;s approval.

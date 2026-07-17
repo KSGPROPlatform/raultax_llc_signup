@@ -19,6 +19,7 @@ import {
 import type { Declaration } from "@/lib/profileData";
 import { allowedTaxYears } from "@/lib/taxYear";
 import { useToast } from "@/components/ui/Toast";
+import { FEE_LABEL, netRefundAfterFee } from "@/lib/firm";
 
 // The dashboard's tax-declaration hub. One row per started year:
 //   - row click (or Actions -> View) opens the read-only review
@@ -286,9 +287,11 @@ export function DeclarationsCard() {
                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                     {result?.status === "approved"
                       ? (result.refund ?? 0) > 0
-                        ? `Approved — refund $${Number(result.refund).toLocaleString()}`
+                        ? netRefundAfterFee(Number(result.refund)) !== null
+                          ? `Approved — refund $${Number(result.refund).toLocaleString()} · you'll receive $${Number(netRefundAfterFee(Number(result.refund))).toLocaleString()} after our ${FEE_LABEL} fee`
+                          : `Approved — refund $${Number(result.refund).toLocaleString()} (our ${FEE_LABEL} preparation fee applies)`
                         : (result.owed ?? 0) > 0
-                          ? `Approved — you owe $${Number(result.owed).toLocaleString()}`
+                          ? `Approved — you owe $${Number(result.owed).toLocaleString()} + our ${FEE_LABEL} preparation fee`
                           : "Approved — balanced"
                       : "Awaiting preparer review"}
                   </p>
