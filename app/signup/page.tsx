@@ -148,7 +148,13 @@ function SignupInner() {
       }
     >
       <form onSubmit={startSignup} className="space-y-4" noValidate>
-        <FormError message={error} />
+        {invite && (
+            <p className="mb-3 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-800">
+              You&apos;ve been invited to join <span className="font-semibold">raultax</span> as a
+              reviewer — create your account with this email to get started.
+            </p>
+          )}
+          <FormError message={error} />
         <Field
           id="first_name"
           label="First name"
