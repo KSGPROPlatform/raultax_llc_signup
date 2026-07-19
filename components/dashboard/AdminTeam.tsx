@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { UserPlus, ShieldCheck, Loader2, X } from "lucide-react";
+import { UserPlus, ShieldCheck, Loader2, X, Copy, Mail } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 
 type TeamUser = { entra_object_id: string; name: string | null; email: string | null };
@@ -18,6 +18,32 @@ export function AdminTeam() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [lastInvite, setLastInvite] = useState<string | null>(null);
+
+  const inviteLink = (addr: string) =>
+    `${window.location.origin}/signup?invite=${encodeURIComponent(addr)}`;
+
+  function copyLink(addr: string) {
+    navigator.clipboard
+      .writeText(inviteLink(addr))
+      .then(() => toast.success("Invite link copied — send it to them any way you like."))
+      .catch(() => toast.error("Could not copy — long-press the link to copy manually."));
+  }
+
+  function emailLink(addr: string) {
+    const subject = encodeURIComponent("You're invited to join raultax as a reviewer");
+    const body = encodeURIComponent(
+      `Hello,
+
+You've been invited to join raultax as a tax-return reviewer.
+
+Create your account here (use this same email address):
+${inviteLink(addr)}
+
+See you inside!`,
+    );
+    window.location.href = `mailto:${addr}?subject=${subject}&body=${body}`;
+  }
 
   async function refresh() {
     try {
@@ -55,8 +81,9 @@ export function AdminTeam() {
       toast.success(
         d.promoted
           ? `${email} is now a reviewer.`
-          : `${email} invited — they become a reviewer when they sign up.`,
+          : `${email} invited — now send them their sign-up link below.`,
       );
+      setLastInvite(d.promoted ? null : email);
       setEmail("");
       await refresh();
     } catch {
@@ -120,6 +147,31 @@ export function AdminTeam() {
         </button>
       </form>
 
+      {lastInvite && (
+        <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3.5 dark:border-sky-500/25 dark:bg-sky-500/10">
+          <p className="text-xs font-medium text-sky-800 dark:text-sky-300">
+            Invite created for <span className="font-semibold">{lastInvite}</span> — send them
+            their account-creation link:
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => emailLink(lastInvite)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-500"
+            >
+              <Mail className="h-3.5 w-3.5" /> Send by email
+            </button>
+            <button
+              type="button"
+              onClick={() => copyLink(lastInvite)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-100 dark:border-sky-500/40 dark:text-sky-300"
+            >
+              <Copy className="h-3.5 w-3.5" /> Copy link
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="mt-4 h-16 animate-pulse rounded-lg bg-zinc-100 dark:bg-zinc-900" />
       ) : (
@@ -153,9 +205,14 @@ export function AdminTeam() {
               </p>
               <ul className="mt-2 space-y-1.5">
                 {invites.map((inv) => (
-                  <li key={inv.email} className="flex items-center gap-2 rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300">
+                  <li key={inv.email} className="flex flex-wrap items-center gap-2 rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300">
                     <span className="min-w-0 flex-1 truncate">{inv.email}</span>
-                    <span className="text-[11px] text-zinc-400">waiting for sign-up</span>
+                    <button type="button" onClick={() => emailLink(inv.email)} aria-label={`Email the invite link to ${inv.email}`} className="text-zinc-400 hover:text-sky-600">
+                      <Mail className="h-3.5 w-3.5" />
+                    </button>
+                    <button type="button" onClick={() => copyLink(inv.email)} aria-label={`Copy the invite link for ${inv.email}`} className="text-zinc-400 hover:text-sky-600">
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
                     <button type="button" onClick={() => withdraw(inv)} aria-label={`Withdraw invite for ${inv.email}`} className="text-zinc-400 hover:text-red-500">
                       <X className="h-3.5 w-3.5" />
                     </button>

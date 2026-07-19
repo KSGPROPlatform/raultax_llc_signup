@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,12 +16,23 @@ import { PasswordField } from "@/components/forms/PasswordField";
 import { validateEmail, validateName, validatePassword } from "@/lib/validation";
 import { postJson } from "@/lib/api";
 
+// useSearchParams needs a Suspense boundary during prerender.
 export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupInner />
+    </Suspense>
+  );
+}
+
+function SignupInner() {
   const router = useRouter();
+  const search = useSearchParams();
+  const invite = (search.get("invite") ?? "").trim();
   const [step, setStep] = useState<"account" | "otp">("account");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(invite);
   const [password, setPassword] = useState("");
   const [continuationToken, setContinuationToken] = useState("");
   const [target, setTarget] = useState<string | null>(null);
@@ -86,6 +98,12 @@ export default function SignupPage() {
         subtitle={`Enter the code we sent to ${target ?? "your email"}.`}
       >
         <form onSubmit={verify} className="space-y-4">
+          {invite && (
+            <p className="mb-3 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-800">
+              You&apos;ve been invited to join <span className="font-semibold">raultax</span> as a
+              reviewer — create your account with this email to get started.
+            </p>
+          )}
           <FormError message={error} />
           <Field
             id="otp"

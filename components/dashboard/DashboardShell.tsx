@@ -7,6 +7,9 @@ import {
   LayoutDashboard,
   FileText,
   ShieldCheck,
+  ClipboardList,
+  UserCog,
+  Users,
   Menu,
   X,
   type LucideIcon,
@@ -29,6 +32,9 @@ function initialsOf(name: string, email: string): string {
 function pageTitle(pathname: string, role: Role): string {
   if (pathname.startsWith("/dashboard/declaration")) return "Tax declaration";
   if (pathname.startsWith("/dashboard/return")) return "My Form 1040";
+  if (pathname.startsWith("/dashboard/admin/declarations")) return "Declarations";
+  if (pathname.startsWith("/dashboard/admin/team")) return "Review team";
+  if (pathname.startsWith("/dashboard/admin/clients")) return "Clients";
   if (pathname.startsWith("/dashboard/admin")) return "Overview";
   if (pathname.startsWith("/dashboard/review")) return "Review queue";
   return role === "admin" ? "Overview" : role === "reviewer" ? "Review queue" : "Dashboard";
@@ -52,7 +58,12 @@ export function DashboardShell({
     role === "admin" ? "/dashboard/admin" : role === "reviewer" ? "/dashboard/review" : "/dashboard/user";
   const nav: NavItem[] =
     role === "admin"
-      ? [{ label: "Overview", href: "/dashboard/admin", icon: LayoutDashboard }]
+      ? [
+          { label: "Overview", href: "/dashboard/admin", icon: LayoutDashboard },
+          { label: "Declarations", href: "/dashboard/admin/declarations", icon: ClipboardList },
+          { label: "Review team", href: "/dashboard/admin/team", icon: UserCog },
+          { label: "Clients", href: "/dashboard/admin/clients", icon: Users },
+        ]
       : role === "reviewer"
         ? [{ label: "Review queue", href: "/dashboard/review", icon: LayoutDashboard }]
         : [
@@ -82,13 +93,16 @@ export function DashboardShell({
           Menu
         </p>
         <div className="space-y-1">
-          {nav.map((item) => {
+          {(() => {
+            const matches = nav
+              .map((item) => item.href.split("#")[0])
+              .filter((b) => pathname === b || pathname.startsWith(b + "/"));
+            const best = matches.sort((a, b) => b.length - a.length)[0];
+            return nav.map((item) => {
             const base = item.href.split("#")[0];
             const active =
-              item.href.startsWith("/dashboard") &&
-              (pathname === base ||
-                pathname.startsWith(base + "/") ||
-                (base === "/dashboard/user" && pathname.startsWith("/dashboard/declaration")));
+              base === best ||
+              (base === "/dashboard/user" && pathname.startsWith("/dashboard/declaration"));
             return (
               <Link
                 key={item.label}
@@ -111,7 +125,8 @@ export function DashboardShell({
                 {item.label}
               </Link>
             );
-          })}
+          });
+          })()}
         </div>
       </nav>
 

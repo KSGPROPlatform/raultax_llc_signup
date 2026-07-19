@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Clock, Inbox } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
+import { UserDetailModal } from "@/components/dashboard/AdminOverview";
 
 type QueueRow = {
   owner_oid: string;
@@ -21,8 +22,9 @@ type Reviewer = { entra_object_id: string; name: string | null; email: string | 
 // The admin's declarations queue: every submitted year across all clients,
 // with a per-row reviewer assignment. Assigning hands the declaration to that
 // reviewer's queue (they review, adjust, approve).
-export function AdminQueue({ onOpenUser }: { onOpenUser?: (oid: string) => void }) {
+export function AdminQueue() {
   const toast = useToast();
+  const [openOid, setOpenOid] = useState<string | null>(null);
   const [rows, setRows] = useState<QueueRow[] | null>(null);
   const [reviewers, setReviewers] = useState<Reviewer[]>([]);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -121,7 +123,7 @@ export function AdminQueue({ onOpenUser }: { onOpenUser?: (oid: string) => void 
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
-                    onClick={() => onOpenUser?.(r.owner_oid)}
+                    onClick={() => setOpenOid(r.owner_oid)}
                     className="text-left text-sm font-medium text-zinc-900 hover:underline dark:text-zinc-50"
                   >
                     {r.user_name || r.user_email || "—"}
@@ -165,6 +167,7 @@ export function AdminQueue({ onOpenUser }: { onOpenUser?: (oid: string) => void 
           })}
         </ul>
       )}
+      {openOid && <UserDetailModal oid={openOid} onClose={() => setOpenOid(null)} />}
     </section>
   );
 }

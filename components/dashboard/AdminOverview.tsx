@@ -2,14 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  Users,
-  UserCheck,
-  ShieldCheck,
-  Building2,
-  Briefcase,
-  UsersRound,
-  FileText,
-  UserPlus,
   Search,
   Eye,
   Download,
@@ -17,8 +9,8 @@ import {
   Loader2,
   CheckCircle2,
   Clock,
+  FileText,
 } from "lucide-react";
-import { StatCard } from "@/components/dashboard/StatCard";
 import { RoleBadge } from "@/components/dashboard/RoleBadge";
 import { maskTail } from "@/components/profile/mask";
 import { docTypeLabel } from "@/lib/docTypes";
@@ -66,21 +58,6 @@ export function AdminOverview() {
     };
   }, []);
 
-  const k = useMemo(() => {
-    const sum = (f: (u: AdminUserRow) => number) => users.reduce((s, u) => s + f(u), 0);
-    const cutoff = Date.now() - 30 * 86_400_000;
-    return {
-      total: users.length,
-      admins: users.filter((u) => u.role === "admin").length,
-      onboarded: users.filter((u) => u.onboarding_completed).length,
-      businesses: users.filter((u) => u.owns_establishment).length,
-      companies: sum((u) => u.companies),
-      dependents: sum((u) => u.dependents),
-      documents: sum((u) => u.documents),
-      recent: users.filter((u) => u.created_at && new Date(u.created_at).getTime() >= cutoff).length,
-    };
-  }, [users]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return users;
@@ -91,17 +68,6 @@ export function AdminOverview() {
     );
   }, [users, query]);
 
-  const cards: { label: string; value: number; icon: typeof Users }[] = [
-    { label: "Total users", value: k.total, icon: Users },
-    { label: "Onboarded", value: k.onboarded, icon: UserCheck },
-    { label: "New (30 days)", value: k.recent, icon: UserPlus },
-    { label: "Admins", value: k.admins, icon: ShieldCheck },
-    { label: "Business owners", value: k.businesses, icon: Building2 },
-    { label: "Companies", value: k.companies, icon: Briefcase },
-    { label: "Dependents", value: k.dependents, icon: UsersRound },
-    { label: "Documents", value: k.documents, icon: FileText },
-  ];
-
   return (
     <div className="space-y-6">
       {error && (
@@ -109,15 +75,6 @@ export function AdminOverview() {
           {error}
         </p>
       )}
-
-      {/* KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {loading
-          ? [...Array(8)].map((_, i) => (
-              <div key={i} className="h-[88px] animate-pulse rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950" />
-            ))
-          : cards.map((c) => <StatCard key={c.label} label={c.label} value={c.value} icon={c.icon} />)}
-      </div>
 
       {/* Users table */}
       <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
