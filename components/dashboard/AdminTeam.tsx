@@ -18,7 +18,7 @@ export function AdminTeam() {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
-  const [lastInvite, setLastInvite] = useState<string | null>(null);
+  const [lastInvite, setLastInvite] = useState<{ email: string; kind: "invited" | "promoted" } | null>(null);
 
   const inviteLink = (addr: string) =>
     `${window.location.origin}/signup?invite=${encodeURIComponent(addr)}`;
@@ -80,10 +80,10 @@ See you inside!`,
       }
       toast.success(
         d.promoted
-          ? `${email} is now a reviewer.`
-          : `${email} invited — now send them their sign-up link below.`,
+          ? `${email} already had an account — they're a reviewer now.`
+          : `${email} invited — send them their sign-up link below.`,
       );
-      setLastInvite(d.promoted ? null : email);
+      setLastInvite({ email, kind: d.promoted ? "promoted" : "invited" });
       setEmail("");
       await refresh();
     } catch {
@@ -150,20 +150,54 @@ See you inside!`,
       {lastInvite && (
         <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3.5 dark:border-sky-500/25 dark:bg-sky-500/10">
           <p className="text-xs font-medium text-sky-800 dark:text-sky-300">
-            Invite created for <span className="font-semibold">{lastInvite}</span> — send them
-            their account-creation link:
+            {lastInvite.kind === "invited" ? (
+              <>
+                Invite created for <span className="font-semibold">{lastInvite.email}</span> —
+                give them this link to create their account (their email will be
+                pre-filled; they choose their own password):
+              </>
+            ) : (
+              <>
+                <span className="font-semibold">{lastInvite.email}</span> already had an
+                account — they&apos;re a reviewer now. Send them the sign-in link:
+              </>
+            )}
           </p>
+          <input
+            readOnly
+            value={
+              lastInvite.kind === "invited"
+                ? inviteLink(lastInvite.email)
+                : `${window.location.origin}/login`
+            }
+            onFocus={(e) => e.target.select()}
+            aria-label="Invite link"
+            className="mt-2 w-full rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs text-zinc-800 outline-none dark:border-sky-500/40 dark:bg-zinc-900 dark:text-zinc-200"
+          />
           <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => emailLink(lastInvite)}
+              onClick={() =>
+                lastInvite.kind === "invited"
+                  ? emailLink(lastInvite.email)
+                  : (window.location.href = `mailto:${lastInvite.email}?subject=${encodeURIComponent("You're now a raultax reviewer")}&body=${encodeURIComponent(`Hello,\n\nYour raultax account is now a reviewer account. Sign in here:\n${window.location.origin}/login\n\nSee you inside!`)}`)
+              }
               className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-sky-500"
             >
               <Mail className="h-3.5 w-3.5" /> Send by email
             </button>
             <button
               type="button"
-              onClick={() => copyLink(lastInvite)}
+              onClick={() =>
+                navigator.clipboard
+                  .writeText(
+                    lastInvite.kind === "invited"
+                      ? inviteLink(lastInvite.email)
+                      : `${window.location.origin}/login`,
+                  )
+                  .then(() => toast.success("Link copied."))
+                  .catch(() => toast.error("Could not copy — select the link above and copy it."))
+              }
               className="inline-flex items-center gap-1.5 rounded-lg border border-sky-300 px-3 py-1.5 text-xs font-semibold text-sky-700 transition-colors hover:bg-sky-100 dark:border-sky-500/40 dark:text-sky-300"
             >
               <Copy className="h-3.5 w-3.5" /> Copy link
